@@ -10,33 +10,37 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="assets\pieces\black-bishop.png" />
-    <None Remove="assets\pieces\black-king.png" />
-    <None Remove="assets\pieces\black-knight.png" />
-    <None Remove="assets\pieces\black-pawn.png" />
-    <None Remove="assets\pieces\black-queen.png" />
-    <None Remove="assets\pieces\black-rook.png" />
-    <None Remove="assets\pieces\white-bishop.png" />
-    <None Remove="assets\pieces\white-king.png" />
-    <None Remove="assets\pieces\white-knight.png" />
-    <None Remove="assets\pieces\white-pawn.png" />
-    <None Remove="assets\pieces\white-queen.png" />
-    <None Remove="assets\pieces\white-rook.png" />
+    <None Remove="Assets\black-king.ico" />
+    <None Remove="Assets\Pieces\black-bishop.png" />
+    <None Remove="Assets\Pieces\black-king.png" />
+    <None Remove="Assets\Pieces\black-knight.png" />
+    <None Remove="Assets\Pieces\black-pawn.png" />
+    <None Remove="Assets\Pieces\black-queen.png" />
+    <None Remove="Assets\Pieces\black-rook.png" />
+    <None Remove="Assets\Pieces\white-bishop.png" />
+    <None Remove="Assets\Pieces\white-king.png" />
+    <None Remove="Assets\Pieces\white-knight.png" />
+    <None Remove="Assets\Pieces\white-pawn.png" />
+    <None Remove="Assets\Pieces\white-queen.png" />
+    <None Remove="Assets\Pieces\white-rook.png" />
+    <None Remove="Resources\Book.txt" />
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="assets\pieces\black-bishop.png" />
-    <Resource Include="assets\pieces\black-king.png" />
-    <Resource Include="assets\pieces\black-knight.png" />
-    <Resource Include="assets\pieces\black-pawn.png" />
-    <Resource Include="assets\pieces\black-queen.png" />
-    <Resource Include="assets\pieces\black-rook.png" />
-    <Resource Include="assets\pieces\white-bishop.png" />
-    <Resource Include="assets\pieces\white-king.png" />
-    <Resource Include="assets\pieces\white-knight.png" />
-    <Resource Include="assets\pieces\white-pawn.png" />
-    <Resource Include="assets\pieces\white-queen.png" />
-    <Resource Include="assets\pieces\white-rook.png" />
+    <Resource Include="Assets\black-king.ico" />
+    <Resource Include="Assets\Pieces\black-bishop.png" />
+    <Resource Include="Assets\Pieces\black-king.png" />
+    <Resource Include="Assets\Pieces\black-knight.png" />
+    <Resource Include="Assets\Pieces\black-pawn.png" />
+    <Resource Include="Assets\Pieces\black-queen.png" />
+    <Resource Include="Assets\Pieces\black-rook.png" />
+    <Resource Include="Assets\Pieces\white-bishop.png" />
+    <Resource Include="Assets\Pieces\white-king.png" />
+    <Resource Include="Assets\Pieces\white-knight.png" />
+    <Resource Include="Assets\Pieces\white-pawn.png" />
+    <Resource Include="Assets\Pieces\white-queen.png" />
+    <Resource Include="Assets\Pieces\white-rook.png" />
+    <Resource Include="Resources\Book.txt" />
   </ItemGroup>
 
 </Project>

@@ -1,87 +1,86 @@
-﻿using System.Text;
+﻿using chess_engine.Core;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace chess_engine
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         private readonly Brush lightSquareBrush = new SolidColorBrush(Color.FromRgb(210, 180, 140));
         private readonly Brush darkSquareBrush = new SolidColorBrush(Color.FromRgb(139, 69, 19));
+        private readonly Engine engine;
+
+        public List<string> Files { get; } = new List<string> { "a", "b", "c", "d", "e", "f", "g", "h" };
+        public List<string> Ranks { get; } = new List<string> { "8", "7", "6", "5", "4", "3", "2", "1" };
 
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = this;
+            engine = new Engine();
+            engine.OnMoveMade += HandleEngineMove;
+
+            engine.NewGame();
             PopulateChessBoard();
         }
 
         private void PopulateChessBoard()
         {
             var squares = new List<ChessSquare>();
+            int[] boardSquares = engine.GetBoardSquares(); // Directly access the board's square array
+
             for (int row = 0; row < 8; row++)
             {
                 for (int col = 0; col < 8; col++)
                 {
+                    int correctRow = 7 - row;
+                    int squareIndex = correctRow * 8 + col;
+
                     var background = (row + col) % 2 == 0 ? lightSquareBrush : darkSquareBrush;
-                    var piece = GetPieceImage(row, col);
+                    var piece = GetPieceImage(boardSquares[squareIndex]); // Use integer representation of pieces
                     squares.Add(new ChessSquare { Background = background, Piece = piece });
                 }
             }
+
             ChessBoard.ItemsSource = squares;
         }
 
-        private BitmapImage GetPieceImage(int row, int col)
+        private BitmapImage GetPieceImage(int piece)
         {
             string pieceName = null;
 
-            // Define the default positions of the pieces
-            if (row == 0 || row == 7)
+            if (piece != Piece.None)
             {
-                bool isWhite = row == 7;
-                switch (col)
-                {
-                    case 0:
-                    case 7:
-                        pieceName = "rook";
-                        break;
-                    case 1:
-                    case 6:
-                        pieceName = "knight";
-                        break;
-                    case 2:
-                    case 5:
-                        pieceName = "bishop";
-                        break;
-                    case 3:
-                        pieceName = isWhite ? "queen" : "king";
-                        break;
-                    case 4:
-                        pieceName = isWhite ? "king" : "queen";
-                        break;
-                }
-                pieceName = (isWhite ? "white" : "black") + "-" + pieceName;
-            }
-            else if (row == 1 || row == 6)
-            {
-                pieceName = (row == 6 ? "white" : "black") + "-pawn";
-            }
+                bool isWhite = Piece.IsWhite(piece);
+                int pieceType = Piece.PieceType(piece);
 
-            if (pieceName != null)
-            {
-                return new BitmapImage(new Uri($"pack://application:,,,/chess-engine;component/assets/pieces/{pieceName}.png"));
+                pieceName = pieceType switch
+                {
+                    Piece.Pawn => "pawn",
+                    Piece.Knight => "knight",
+                    Piece.Bishop => "bishop",
+                    Piece.Rook => "rook",
+                    Piece.Queen => "queen",
+                    Piece.King => "king",
+                    _ => null
+                };
+
+                if (pieceName != null)
+                {
+                    pieceName = (isWhite ? "white" : "black") + "-" + pieceName;
+                    return new BitmapImage(new Uri($"pack://application:,,,/chess-engine;component/Assets/Pieces/{pieceName}.png"));
+                }
             }
 
             return null;
+        }
+
+        private void HandleEngineMove(string move)
+        {
+            // Handle the move received from the engine
+            engine.MakeMove(move);
+            PopulateChessBoard();
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
