@@ -1,46 +1,64 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>chess_engine</RootNamespace>
-    <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Assets\black-king.ico" />
-    <None Remove="Assets\Pieces\black-bishop.png" />
-    <None Remove="Assets\Pieces\black-king.png" />
-    <None Remove="Assets\Pieces\black-knight.png" />
-    <None Remove="Assets\Pieces\black-pawn.png" />
-    <None Remove="Assets\Pieces\black-queen.png" />
-    <None Remove="Assets\Pieces\black-rook.png" />
-    <None Remove="Assets\Pieces\white-bishop.png" />
-    <None Remove="Assets\Pieces\white-king.png" />
-    <None Remove="Assets\Pieces\white-knight.png" />
-    <None Remove="Assets\Pieces\white-pawn.png" />
-    <None Remove="Assets\Pieces\white-queen.png" />
-    <None Remove="Assets\Pieces\white-rook.png" />
-    <None Remove="Resources\Book.txt" />
+    <None Remove="Assets\black-king.png" />
+    <None Remove="Assets\Book.txt" />
+    <None Remove="Assets\move-self.wav" />
+    <None Remove="Assets\Pieces.png" />
+    <None Remove="Assets\Roboto-Regular.ttf" />
+    <None Remove="settings.json" />
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\black-king.ico" />
-    <Resource Include="Assets\Pieces\black-bishop.png" />
-    <Resource Include="Assets\Pieces\black-king.png" />
-    <Resource Include="Assets\Pieces\black-knight.png" />
-    <Resource Include="Assets\Pieces\black-pawn.png" />
-    <Resource Include="Assets\Pieces\black-queen.png" />
-    <Resource Include="Assets\Pieces\black-rook.png" />
-    <Resource Include="Assets\Pieces\white-bishop.png" />
-    <Resource Include="Assets\Pieces\white-king.png" />
-    <Resource Include="Assets\Pieces\white-knight.png" />
-    <Resource Include="Assets\Pieces\white-pawn.png" />
-    <Resource Include="Assets\Pieces\white-queen.png" />
-    <Resource Include="Assets\Pieces\white-rook.png" />
-    <Resource Include="Resources\Book.txt" />
+    <PackageReference Include="Raylib-cs" Version="6.1.1" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\black-king.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Book.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\move-self.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Pieces.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Roboto-Regular.ttf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="settings.json">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>settings.Designer.cs</LastGenOutput>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ProjectExtensions><VisualStudio><UserProperties settings_1json__JsonSchema="json" /></VisualStudio></ProjectExtensions>
 
 </Project>
