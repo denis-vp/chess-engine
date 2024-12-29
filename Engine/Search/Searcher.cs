@@ -16,7 +16,6 @@
         public event Action<Move>? OnSearchComplete;
 
         // State
-        public int CurrentDepth;
         public Move BestMoveSoFar => bestMove;
         public int BestEvalSoFar => bestEval;
         bool isPlayingWhite;
@@ -26,13 +25,6 @@
         int bestEval;
         bool hasSearchedAtLeastOneMove;
         bool searchCancelled;
-
-        // Diagnostics
-        public SearchDiagnostics searchDiagnostics;
-        int currentIterationDepth;
-        System.Diagnostics.Stopwatch searchIterationTimer;
-        System.Diagnostics.Stopwatch searchTotalTimer;
-        public string debugInfo;
 
         // References
         readonly TranspositionTable transpositionTable;
@@ -67,12 +59,7 @@
             repetitionTable.Init(board);
 
             // Initialize debug info
-            CurrentDepth = 0;
-            debugInfo = "Starting search with FEN " + FenUtility.CurrentFen(board);
             searchCancelled = false;
-            searchDiagnostics = new SearchDiagnostics();
-            searchIterationTimer = new System.Diagnostics.Stopwatch();
-            searchTotalTimer = System.Diagnostics.Stopwatch.StartNew();
 
             // Search
             RunIterativeDeepeningSearch();
@@ -96,9 +83,6 @@
             for (int searchDepth = 1; searchDepth <= 256; searchDepth++)
             {
                 hasSearchedAtLeastOneMove = false;
-                debugInfo += "\nStarting Iteration: " + searchDepth;
-                searchIterationTimer.Restart();
-                currentIterationDepth = searchDepth;
                 Search(searchDepth, 0, negativeInfinity, positiveInfinity);
 
                 if (searchCancelled)
@@ -107,39 +91,22 @@
                     {
                         bestMove = bestMoveThisIteration;
                         bestEval = bestEvalThisIteration;
-                        searchDiagnostics.move = MoveUtility.GetMoveNameUCI(bestMove);
-                        searchDiagnostics.eval = bestEval;
-                        searchDiagnostics.moveIsFromPartialSearch = true;
-                        debugInfo += "\nUsing partial search result: " + MoveUtility.GetMoveNameUCI(bestMove) + " Eval: " + bestEval;
                     }
 
-                    debugInfo += "\nSearch aborted";
                     break;
                 }
                 else
                 {
-                    CurrentDepth = searchDepth;
                     bestMove = bestMoveThisIteration;
                     bestEval = bestEvalThisIteration;
-
-                    debugInfo += "\nIteration result: " + MoveUtility.GetMoveNameUCI(bestMove) + " Eval: " + bestEval;
-                    if (IsMateScore(bestEval))
-                    {
-                        debugInfo += " Mate in ply: " + NumPlyToMateFromScore(bestEval);
-                    }
 
                     bestEvalThisIteration = int.MinValue;
                     bestMoveThisIteration = Move.NullMove;
 
-                    // Update diagnostics
-                    searchDiagnostics.numCompletedIterations = searchDepth;
-                    searchDiagnostics.move = MoveUtility.GetMoveNameUCI(bestMove);
-                    searchDiagnostics.eval = bestEval;
                     // Exit search if found a mate within search depth.
                     // A mate found outside of search depth (due to extensions) may not be the fastest mate.
                     if (IsMateScore(bestEval) && NumPlyToMateFromScore(bestEval) <= searchDepth)
                     {
-                        debugInfo += "\nExitting search due to mate found within search depth";
                         break;
                     }
                 }
@@ -233,7 +200,7 @@
 
             if (plyFromRoot > 0)
             {
-                bool wasPawnMove = Piece.PieceType(board.Square[prevMove.TargetSquare]) == Piece.Pawn;
+                bool wasPawnMove = Piece.PieceType(board.Squares[prevMove.TargetSquare]) == Piece.Pawn;
                 repetitionTable.Push(board.CurrentGameState.zobristKey, prevWasCapture || wasPawnMove);
             }
 
@@ -243,7 +210,7 @@
             for (int i = 0; i < moves.Length; i++)
             {
                 Move move = moves[i];
-                int capturedPieceType = Piece.PieceType(board.Square[move.TargetSquare]);
+                int capturedPieceType = Piece.PieceType(board.Squares[move.TargetSquare]);
                 bool isCapture = capturedPieceType != Piece.None;
                 board.MakeMove(moves[i], inSearch: true);
 
@@ -251,7 +218,7 @@
                 int extension = 0;
                 if (numExtensions < maxExtentions)
                 {
-                    int movedPieceType = Piece.PieceType(board.Square[move.TargetSquare]);
+                    int movedPieceType = Piece.PieceType(board.Squares[move.TargetSquare]);
                     int targetRank = BoardHelper.RankIndex(move.TargetSquare);
                     if (board.IsInCheck())
                     {
@@ -302,14 +269,13 @@
                             moveOrderer.killerMoves[plyFromRoot].Add(move);
                         }
                         int historyScore = plyRemaining * plyRemaining;
-                        moveOrderer.History[board.MoveColourIndex, moves[i].StartSquare, moves[i].TargetSquare] += historyScore;
+                        moveOrderer.History[board.MoveColorIndex, moves[i].StartSquare, moves[i].TargetSquare] += historyScore;
                     }
                     if (plyFromRoot > 0)
                     {
                         repetitionTable.TryPop();
                     }
 
-                    searchDiagnostics.numCutOffs++;
                     return beta;
                 }
 
@@ -351,10 +317,8 @@
             // This prevents situations where a player ony has bad captures available from being evaluated as bad,
             // when the player might have good non-capture moves available.
             int eval = evaluation.Evaluate(board);
-            searchDiagnostics.numPositionsEvaluated++;
             if (eval >= beta)
             {
-                searchDiagnostics.numCutOffs++;
                 return beta;
             }
             if (eval > alpha)
@@ -373,7 +337,6 @@
 
                 if (eval >= beta)
                 {
-                    searchDiagnostics.numCutOffs++;
                     return beta;
                 }
                 if (eval > alpha)
@@ -423,25 +386,5 @@
         }
 
         public TranspositionTable GetTranspositionTable() => transpositionTable;
-
-        [Serializable]
-        public struct SearchDiagnostics
-        {
-            public int numCompletedIterations;
-            public int numPositionsEvaluated;
-            public ulong numCutOffs;
-
-            public string moveVal;
-            public string move;
-            public int eval;
-            public bool moveIsFromPartialSearch;
-            public int NumQChecks;
-            public int numQMates;
-
-            public bool isBook;
-
-            public int maxExtentionReachedInSearch;
-        }
-
     }
 }

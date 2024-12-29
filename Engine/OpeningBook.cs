@@ -8,7 +8,7 @@ namespace chess_engine.Engine
         public OpeningBook(string file)
         {
             rng = new Random();
-            Span<string> entries = file.Trim(new char[] { ' ', '\n' }).Split("pos").AsSpan(1);
+            Span<string> entries = file.Trim([' ', '\n']).Split("pos").AsSpan(1);
             movesByPosition = new Dictionary<string, BookMove[]>(entries.Length);
 
             for (int i = 0; i < entries.Length; i++)
@@ -34,8 +34,8 @@ namespace chess_engine.Engine
             return movesByPosition.ContainsKey(RemoveMoveCountersFromFEN(positionFen));
         }
 
-        // WeightPow is a value between 0 and 1.
-        // 0 means all moves are picked with equal probablity, 1 means moves are weighted by num times played.
+        // weightPow determines whether or not the number of times a move has been played should be taken into account.
+        // 0 - 1; 0 = no weight, 1 = full weight.
         public bool TryGetBookMove(Board board, out string moveString, double weightPow = 0.5)
         {
             string positionFen = FenUtility.CurrentFen(board, alwaysIncludeEPSquare: false);
@@ -88,7 +88,6 @@ namespace chess_engine.Engine
             string fenA = fen.Substring(0, fen.LastIndexOf(' '));
             return fenA.Substring(0, fenA.LastIndexOf(' '));
         }
-
 
         public readonly struct BookMove
         {

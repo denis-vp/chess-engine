@@ -65,7 +65,7 @@
 
             bool isWhite = colourIndex == Board.WhiteIndex;
             int friendlyPawn = Piece.MakePiece(Piece.Pawn, isWhite);
-            int kingSquare = board.KingSquare[colourIndex];
+            int kingSquare = board.KingSquares[colourIndex];
             int kingFile = BoardHelper.FileIndex(kingSquare);
 
             //int filePenalty = kingOpeningFilePenalty[kingFile];
@@ -79,9 +79,9 @@
                 for (int i = 0; i < squares.Length / 2; i++)
                 {
                     int shieldSquareIndex = squares[i];
-                    if (board.Square[shieldSquareIndex] != friendlyPawn)
+                    if (board.Squares[shieldSquareIndex] != friendlyPawn)
                     {
-                        if (squares.Length > 3 && board.Square[squares[i + 3]] == friendlyPawn)
+                        if (squares.Length > 3 && board.Squares[squares[i + 3]] == friendlyPawn)
                         {
                             penalty += kingPawnShieldScores[i + 3];
                         }
@@ -185,8 +185,8 @@
                 int friendlyIndex = isWhite ? Board.WhiteIndex : Board.BlackIndex;
                 int opponentIndex = isWhite ? Board.BlackIndex : Board.WhiteIndex;
 
-                int friendlyKingSquare = board.KingSquare[friendlyIndex];
-                int opponentKingSquare = board.KingSquare[opponentIndex];
+                int friendlyKingSquare = board.KingSquares[friendlyIndex];
+                int opponentKingSquare = board.KingSquares[opponentIndex];
                 // Encourage moving king closer to opponent king
                 mopUpScore += (14 - PrecomputedMoveData.OrthogonalDistance[friendlyKingSquare, opponentKingSquare]) * 4;
                 // Encourage pushing opponent king to edge of board
@@ -223,9 +223,9 @@
             value += (int)(pawnEarly * (1 - endgameT));
             value += (int)(pawnLate * endgameT);
 
-            int kingEarlyPhase = PieceSquareTable.Read(PieceSquareTable.KingStart, board.KingSquare[colourIndex], isWhite);
+            int kingEarlyPhase = PieceSquareTable.Read(PieceSquareTable.KingStart, board.KingSquares[colourIndex], isWhite);
             value += (int)(kingEarlyPhase * (1 - endgameT));
-            int kingLatePhase = PieceSquareTable.Read(PieceSquareTable.KingEnd, board.KingSquare[colourIndex], isWhite);
+            int kingLatePhase = PieceSquareTable.Read(PieceSquareTable.KingEnd, board.KingSquares[colourIndex], isWhite);
             value += (int)(kingLatePhase * (endgameT));
 
             return value;

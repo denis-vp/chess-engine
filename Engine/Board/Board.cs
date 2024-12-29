@@ -1,23 +1,22 @@
 ﻿namespace chess_engine.Engine
 {
-    // Represents the current state of the board during a game.
-    // The state includes things such as: positions of all pieces, side to move,
-    // castling rights, en-passant square, etc. Some extra information is included
-    // as well to help with evaluation and move generation.
-
-    // The initial state of the board can be set from a FEN string, and moves are
-    // subsequently made (or undone) using the MakeMove and UnmakeMove functions.
+    // Represents the current state of the game
+    // Stores piece positions, side to move, castling rights,
+    // en passant file, fifty move counter, etc.
 
     public sealed class Board
     {
         public const int WhiteIndex = 0;
         public const int BlackIndex = 1;
 
-        // Stores piece code for each square on the board
-        public int[] Square;
-        // Square index of white and black king
-        public int[] KingSquare;
-        // # Bitboards
+        // Information about every square on the board
+        // Index = square index (0-63), value = piece on that square
+        public int[] Squares;
+        // Index of king square for each colour
+        // Index 0 = white, index 1 = black
+        public int[] KingSquares;
+
+        // Bitboards
         // Bitboard for each piece type and colour (white pawns, white knights, ... black pawns, etc.)
         public ulong[] PieceBitboards;
         // Bitboards for all pieces of either colour (all white pieces, all black pieces)
@@ -29,19 +28,19 @@
         public ulong EnemyDiagonalSliders;
         // Piece count excluding pawns and kings
         public int TotalPieceCountWithoutPawnsAndKings;
-        // # Piece lists
+
+        // Piece lists
         public PieceList[] Rooks;
         public PieceList[] Bishops;
         public PieceList[] Queens;
         public PieceList[] Knights;
         public PieceList[] Pawns;
 
-        // # Side to move info
         public bool IsWhiteToMove;
-        public int MoveColour => IsWhiteToMove ? Piece.White : Piece.Black;
-        public int OpponentColour => IsWhiteToMove ? Piece.Black : Piece.White;
-        public int MoveColourIndex => IsWhiteToMove ? WhiteIndex : BlackIndex;
-        public int OpponentColourIndex => IsWhiteToMove ? BlackIndex : WhiteIndex;
+        public int MoveColor => IsWhiteToMove ? Piece.White : Piece.Black;
+        public int OpponentColor => IsWhiteToMove ? Piece.Black : Piece.White;
+        public int MoveColorIndex => IsWhiteToMove ? WhiteIndex : BlackIndex;
+        public int OpponentColorIndex => IsWhiteToMove ? BlackIndex : WhiteIndex;
         // List of (hashed) positions since last pawn move or capture (for detecting repetitions)
         public Stack<ulong> RepetitionPositionHistory;
 
@@ -51,14 +50,13 @@
         public GameState CurrentGameState;
         public ulong ZobristKey => CurrentGameState.zobristKey;
         public string CurrentFEN => FenUtility.CurrentFen(this);
-        public string GameStartFEN => StartPositionInfo.fen;
+        public string GameStartFEN => startPositionInfo.fen;
         public List<Move> AllGameMoves;
 
 
-        // # Private stuff
         PieceList[] allPieceLists;
         Stack<GameState> gameStateHistory;
-        FenUtility.PositionInfo StartPositionInfo;
+        FenUtility.PositionInfo startPositionInfo;
         bool cachedInCheckValue;
         bool hasCachedInCheckValue;
 
@@ -66,7 +64,7 @@
         {
             if (source != null)
             {
-                LoadPosition(source.StartPositionInfo);
+                LoadPosition(source.startPositionInfo);
 
                 for (int i = 0; i < source.AllGameMoves.Count; i++)
                 {
@@ -87,9 +85,9 @@
             bool isPromotion = move.IsPromotion;
             bool isEnPassant = moveFlag is Move.EnPassantCaptureFlag;
 
-            int movedPiece = Square[startSquare];
+            int movedPiece = Squares[startSquare];
             int movedPieceType = Piece.PieceType(movedPiece);
-            int capturedPiece = isEnPassant ? Piece.MakePiece(Piece.Pawn, OpponentColour) : Square[targetSquare];
+            int capturedPiece = isEnPassant ? Piece.MakePiece(Piece.Pawn, OpponentColor) : Squares[targetSquare];
             int capturedPieceType = Piece.PieceType(capturedPiece);
 
             int prevCastleState = CurrentGameState.castlingRights;
@@ -109,7 +107,7 @@
                 if (isEnPassant)
                 {
                     captureSquare = targetSquare + (IsWhiteToMove ? -8 : 8);
-                    Square[captureSquare] = Piece.None;
+                    Squares[captureSquare] = Piece.None;
                 }
                 if (capturedPieceType != Piece.Pawn)
                 {
@@ -119,30 +117,30 @@
                 // Remove captured piece from bitboards/piece list
                 allPieceLists[capturedPiece].RemovePieceAtSquare(captureSquare);
                 BitBoardUtility.ToggleSquare(ref PieceBitboards[capturedPiece], captureSquare);
-                BitBoardUtility.ToggleSquare(ref ColourBitboards[OpponentColourIndex], captureSquare);
+                BitBoardUtility.ToggleSquare(ref ColourBitboards[OpponentColorIndex], captureSquare);
                 newZobristKey ^= Zobrist.piecesArray[capturedPiece, captureSquare];
             }
 
             // Handle king
             if (movedPieceType == Piece.King)
             {
-                KingSquare[MoveColourIndex] = targetSquare;
+                KingSquares[MoveColorIndex] = targetSquare;
                 newCastlingRights &= (IsWhiteToMove) ? 0b1100 : 0b0011;
 
                 // Handle castling
                 if (moveFlag == Move.CastleFlag)
                 {
-                    int rookPiece = Piece.MakePiece(Piece.Rook, MoveColour);
+                    int rookPiece = Piece.MakePiece(Piece.Rook, MoveColor);
                     bool kingside = targetSquare == BoardHelper.g1 || targetSquare == BoardHelper.g8;
                     int castlingRookFromIndex = (kingside) ? targetSquare + 1 : targetSquare - 2;
                     int castlingRookToIndex = (kingside) ? targetSquare - 1 : targetSquare + 1;
 
                     // Update rook position
                     BitBoardUtility.ToggleSquares(ref PieceBitboards[rookPiece], castlingRookFromIndex, castlingRookToIndex);
-                    BitBoardUtility.ToggleSquares(ref ColourBitboards[MoveColourIndex], castlingRookFromIndex, castlingRookToIndex);
+                    BitBoardUtility.ToggleSquares(ref ColourBitboards[MoveColorIndex], castlingRookFromIndex, castlingRookToIndex);
                     allPieceLists[rookPiece].MovePiece(castlingRookFromIndex, castlingRookToIndex);
-                    Square[castlingRookFromIndex] = Piece.None;
-                    Square[castlingRookToIndex] = Piece.Rook | MoveColour;
+                    Squares[castlingRookFromIndex] = Piece.None;
+                    Squares[castlingRookToIndex] = Piece.Rook | MoveColor;
 
                     newZobristKey ^= Zobrist.piecesArray[rookPiece, castlingRookFromIndex];
                     newZobristKey ^= Zobrist.piecesArray[rookPiece, castlingRookToIndex];
@@ -162,14 +160,14 @@
                     _ => 0
                 };
 
-                int promotionPiece = Piece.MakePiece(promotionPieceType, MoveColour);
+                int promotionPiece = Piece.MakePiece(promotionPieceType, MoveColor);
 
                 // Remove pawn from promotion square and add promoted piece instead
                 BitBoardUtility.ToggleSquare(ref PieceBitboards[movedPiece], targetSquare);
                 BitBoardUtility.ToggleSquare(ref PieceBitboards[promotionPiece], targetSquare);
                 allPieceLists[movedPiece].RemovePieceAtSquare(targetSquare);
                 allPieceLists[promotionPiece].AddPieceAtSquare(targetSquare);
-                Square[targetSquare] = promotionPiece;
+                Squares[targetSquare] = promotionPiece;
             }
 
             // Pawn has moved two forwards, mark file with en-passant flag
@@ -205,7 +203,7 @@
             // Update zobrist key with new piece position and side to move
             newZobristKey ^= Zobrist.sideToMove;
             newZobristKey ^= Zobrist.piecesArray[movedPiece, startSquare];
-            newZobristKey ^= Zobrist.piecesArray[Square[targetSquare], targetSquare];
+            newZobristKey ^= Zobrist.piecesArray[Squares[targetSquare], targetSquare];
             newZobristKey ^= Zobrist.enPassantFile[prevEnPassantFile];
 
             if (newCastlingRights != prevCastleState)
@@ -263,15 +261,15 @@
             bool undoingPromotion = move.IsPromotion;
             bool undoingCapture = CurrentGameState.capturedPieceType != Piece.None;
 
-            int movedPiece = undoingPromotion ? Piece.MakePiece(Piece.Pawn, MoveColour) : Square[movedTo];
+            int movedPiece = undoingPromotion ? Piece.MakePiece(Piece.Pawn, MoveColor) : Squares[movedTo];
             int movedPieceType = Piece.PieceType(movedPiece);
             int capturedPieceType = CurrentGameState.capturedPieceType;
 
             // If undoing promotion, then remove piece from promotion square and replace with pawn
             if (undoingPromotion)
             {
-                int promotedPiece = Square[movedTo];
-                int pawnPiece = Piece.MakePiece(Piece.Pawn, MoveColour);
+                int promotedPiece = Squares[movedTo];
+                int pawnPiece = Piece.MakePiece(Piece.Pawn, MoveColor);
                 TotalPieceCountWithoutPawnsAndKings--;
 
                 allPieceLists[promotedPiece].RemovePieceAtSquare(movedTo);
@@ -286,7 +284,7 @@
             if (undoingCapture)
             {
                 int captureSquare = movedTo;
-                int capturedPiece = Piece.MakePiece(capturedPieceType, OpponentColour);
+                int capturedPiece = Piece.MakePiece(capturedPieceType, OpponentColor);
 
                 if (undoingEnPassant)
                 {
@@ -299,30 +297,30 @@
 
                 // Add back captured piece
                 BitBoardUtility.ToggleSquare(ref PieceBitboards[capturedPiece], captureSquare);
-                BitBoardUtility.ToggleSquare(ref ColourBitboards[OpponentColourIndex], captureSquare);
+                BitBoardUtility.ToggleSquare(ref ColourBitboards[OpponentColorIndex], captureSquare);
                 allPieceLists[capturedPiece].AddPieceAtSquare(captureSquare);
-                Square[captureSquare] = capturedPiece;
+                Squares[captureSquare] = capturedPiece;
             }
 
 
             // Update king
             if (movedPieceType is Piece.King)
             {
-                KingSquare[MoveColourIndex] = movedFrom;
+                KingSquares[MoveColorIndex] = movedFrom;
 
                 // Undo castling
                 if (moveFlag is Move.CastleFlag)
                 {
-                    int rookPiece = Piece.MakePiece(Piece.Rook, MoveColour);
+                    int rookPiece = Piece.MakePiece(Piece.Rook, MoveColor);
                     bool kingside = movedTo == BoardHelper.g1 || movedTo == BoardHelper.g8;
                     int rookSquareBeforeCastling = kingside ? movedTo + 1 : movedTo - 2;
                     int rookSquareAfterCastling = kingside ? movedTo - 1 : movedTo + 1;
 
                     // Undo castling by returning rook to original square
                     BitBoardUtility.ToggleSquares(ref PieceBitboards[rookPiece], rookSquareAfterCastling, rookSquareBeforeCastling);
-                    BitBoardUtility.ToggleSquares(ref ColourBitboards[MoveColourIndex], rookSquareAfterCastling, rookSquareBeforeCastling);
-                    Square[rookSquareAfterCastling] = Piece.None;
-                    Square[rookSquareBeforeCastling] = rookPiece;
+                    BitBoardUtility.ToggleSquares(ref ColourBitboards[MoveColorIndex], rookSquareAfterCastling, rookSquareBeforeCastling);
+                    Squares[rookSquareAfterCastling] = Piece.None;
+                    Squares[rookSquareBeforeCastling] = rookPiece;
                     allPieceLists[rookPiece].MovePiece(rookSquareAfterCastling, rookSquareBeforeCastling);
                 }
             }
@@ -394,7 +392,7 @@
         // Call IsInCheck instead for automatic caching of value
         public bool CalculateInCheckState()
         {
-            int kingSquare = KingSquare[MoveColourIndex];
+            int kingSquare = KingSquares[MoveColorIndex];
             ulong blockers = AllPiecesBitboard;
 
             if (EnemyOrthogonalSliders != 0)
@@ -414,13 +412,13 @@
                 }
             }
 
-            ulong enemyKnights = PieceBitboards[Piece.MakePiece(Piece.Knight, OpponentColour)];
+            ulong enemyKnights = PieceBitboards[Piece.MakePiece(Piece.Knight, OpponentColor)];
             if ((BitBoardUtility.KnightAttacks[kingSquare] & enemyKnights) != 0)
             {
                 return true;
             }
 
-            ulong enemyPawns = PieceBitboards[Piece.MakePiece(Piece.Pawn, OpponentColour)];
+            ulong enemyPawns = PieceBitboards[Piece.MakePiece(Piece.Pawn, OpponentColor)];
             ulong pawnAttackMask = IsWhiteToMove ? BitBoardUtility.WhitePawnAttacks[kingSquare] : BitBoardUtility.BlackPawnAttacks[kingSquare];
             if ((pawnAttackMask & enemyPawns) != 0)
             {
@@ -445,7 +443,7 @@
 
         public void LoadPosition(FenUtility.PositionInfo posInfo)
         {
-            StartPositionInfo = posInfo;
+            startPositionInfo = posInfo;
             Initialize();
 
             // Load pieces into board array and piece lists
@@ -454,7 +452,7 @@
                 int piece = posInfo.squares[squareIndex];
                 int pieceType = Piece.PieceType(piece);
                 int colourIndex = Piece.IsWhite(piece) ? WhiteIndex : BlackIndex;
-                Square[squareIndex] = piece;
+                Squares[squareIndex] = piece;
 
                 if (piece != Piece.None)
                 {
@@ -463,7 +461,7 @@
 
                     if (pieceType == Piece.King)
                     {
-                        KingSquare[colourIndex] = squareIndex;
+                        KingSquares[colourIndex] = squareIndex;
                     }
                     else
                     {
@@ -511,24 +509,24 @@
         void MovePiece(int piece, int startSquare, int targetSquare)
         {
             BitBoardUtility.ToggleSquares(ref PieceBitboards[piece], startSquare, targetSquare);
-            BitBoardUtility.ToggleSquares(ref ColourBitboards[MoveColourIndex], startSquare, targetSquare);
+            BitBoardUtility.ToggleSquares(ref ColourBitboards[MoveColorIndex], startSquare, targetSquare);
 
             allPieceLists[piece].MovePiece(startSquare, targetSquare);
-            Square[startSquare] = Piece.None;
-            Square[targetSquare] = piece;
+            Squares[startSquare] = Piece.None;
+            Squares[targetSquare] = piece;
         }
 
         void UpdateSliderBitboards()
         {
-            int friendlyRook = Piece.MakePiece(Piece.Rook, MoveColour);
-            int friendlyQueen = Piece.MakePiece(Piece.Queen, MoveColour);
-            int friendlyBishop = Piece.MakePiece(Piece.Bishop, MoveColour);
+            int friendlyRook = Piece.MakePiece(Piece.Rook, MoveColor);
+            int friendlyQueen = Piece.MakePiece(Piece.Queen, MoveColor);
+            int friendlyBishop = Piece.MakePiece(Piece.Bishop, MoveColor);
             FriendlyOrthogonalSliders = PieceBitboards[friendlyRook] | PieceBitboards[friendlyQueen];
             FriendlyDiagonalSliders = PieceBitboards[friendlyBishop] | PieceBitboards[friendlyQueen];
 
-            int enemyRook = Piece.MakePiece(Piece.Rook, OpponentColour);
-            int enemyQueen = Piece.MakePiece(Piece.Queen, OpponentColour);
-            int enemyBishop = Piece.MakePiece(Piece.Bishop, OpponentColour);
+            int enemyRook = Piece.MakePiece(Piece.Rook, OpponentColor);
+            int enemyQueen = Piece.MakePiece(Piece.Queen, OpponentColor);
+            int enemyBishop = Piece.MakePiece(Piece.Bishop, OpponentColor);
             EnemyOrthogonalSliders = PieceBitboards[enemyRook] | PieceBitboards[enemyQueen];
             EnemyDiagonalSliders = PieceBitboards[enemyBishop] | PieceBitboards[enemyQueen];
         }
@@ -536,8 +534,8 @@
         void Initialize()
         {
             AllGameMoves = new List<Move>();
-            Square = new int[64];
-            KingSquare = new int[2];
+            Squares = new int[64];
+            KingSquares = new int[2];
 
             RepetitionPositionHistory = new Stack<ulong>(capacity: 64);
             gameStateHistory = new Stack<GameState>(capacity: 64);
@@ -545,11 +543,11 @@
             CurrentGameState = new GameState();
             PlyCount = 0;
 
-            Knights = new PieceList[] { new PieceList(10), new PieceList(10) };
-            Pawns = new PieceList[] { new PieceList(8), new PieceList(8) };
-            Rooks = new PieceList[] { new PieceList(10), new PieceList(10) };
-            Bishops = new PieceList[] { new PieceList(10), new PieceList(10) };
-            Queens = new PieceList[] { new PieceList(9), new PieceList(9) };
+            Knights = [new PieceList(10), new PieceList(10)];
+            Pawns = [new PieceList(8), new PieceList(8)];
+            Rooks = [new PieceList(10), new PieceList(10)];
+            Bishops = [new PieceList(10), new PieceList(10)];
+            Queens = [new PieceList(9), new PieceList(9)];
 
             allPieceLists = new PieceList[Piece.MaxPieceIndex + 1];
             allPieceLists[Piece.WhitePawn] = Pawns[WhiteIndex];

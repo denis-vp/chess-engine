@@ -55,7 +55,7 @@ namespace chess_engine.UI
                 {
                     // If the square contains a piece of the player's colour
                     // Start dragging the piece
-                    int piece = board.Square[square];
+                    int piece = board.Squares[square];
                     if (Piece.IsColour(piece, board.IsWhiteToMove ? Piece.White : Piece.Black))
                     {
                         isDragging = true;

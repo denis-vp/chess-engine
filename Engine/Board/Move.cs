@@ -8,12 +8,16 @@ Bits 12-15: flag (promotion type, etc)
 */
 namespace chess_engine.Engine
 {
+    // 16 bit value to represent a move
+    // ffff tttttt ssssss
+    // f: from square (bits 0-5)
+    // t: to square (bits 6-11)
+    // s: flag (bits 12-15)
+
     public readonly struct Move
     {
-        // 16bit move value
         readonly ushort moveValue;
 
-        // Flags
         public const int NoFlag = 0b0000;
         public const int EnPassantCaptureFlag = 0b0001;
         public const int CastleFlag = 0b0010;
@@ -24,7 +28,6 @@ namespace chess_engine.Engine
         public const int PromoteToRookFlag = 0b0110;
         public const int PromoteToBishopFlag = 0b0111;
 
-        // Masks
         const ushort startSquareMask = 0b0000000000111111;
         const ushort targetSquareMask = 0b0000111111000000;
         const ushort flagMask = 0b1111000000000000;

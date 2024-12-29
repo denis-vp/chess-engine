@@ -1,6 +1,21 @@
 ﻿namespace chess_engine.Engine
 {
-    using System.Linq;
+    public enum GameResult
+    {
+        NotStarted,
+        InProgress,
+        WhiteIsMated,
+        BlackIsMated,
+        Stalemate,
+        Repetition,
+        FiftyMoveRule,
+        InsufficientMaterial,
+        DrawByArbiter,
+        WhiteTimeout,
+        BlackTimeout,
+        WhiteIllegalMove,
+        BlackIllegalMove
+    }
 
     public static class Arbiter
     {
@@ -8,11 +23,6 @@
         {
             return result is GameResult.DrawByArbiter or GameResult.FiftyMoveRule or
                 GameResult.Repetition or GameResult.Stalemate or GameResult.InsufficientMaterial;
-        }
-
-        public static bool IsWinResult(GameResult result)
-        {
-            return IsWhiteWinsResult(result) || IsBlackWinsResult(result);
         }
 
         public static bool IsWhiteWinsResult(GameResult result)
@@ -24,7 +34,6 @@
         {
             return result is GameResult.WhiteIsMated or GameResult.WhiteTimeout or GameResult.WhiteIllegalMove;
         }
-
 
         public static GameResult GetGameState(Board board)
         {
@@ -62,7 +71,7 @@
             return GameResult.InProgress;
         }
 
-        // Test for insufficient material (Note: not all cases are implemented)
+        // Test for insufficient material
         public static bool InsufficentMaterial(Board board)
         {
             // Can't have insufficient material with pawns on the board
@@ -95,14 +104,12 @@
             // Bishop vs bishop: is insufficient when bishops are same colour complex
             if (numMinors == 2 && numWhiteBishops == 1 && numBlackBishops == 1)
             {
-                bool whiteBishopIsLightSquare = BoardHelper.LightSquare(board.Bishops[Board.WhiteIndex][0]);
-                bool blackBishopIsLightSquare = BoardHelper.LightSquare(board.Bishops[Board.BlackIndex][0]);
+                bool whiteBishopIsLightSquare = BoardHelper.IsLightSquare(board.Bishops[Board.WhiteIndex][0]);
+                bool blackBishopIsLightSquare = BoardHelper.IsLightSquare(board.Bishops[Board.BlackIndex][0]);
                 return whiteBishopIsLightSquare == blackBishopIsLightSquare;
             }
 
             return false;
-
-
         }
     }
 }

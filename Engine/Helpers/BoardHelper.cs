@@ -28,13 +28,11 @@
         public const int h8 = 63;
 
 
-        // Rank (0 to 7) of square 
         public static int RankIndex(int squareIndex)
         {
             return squareIndex >> 3;
         }
 
-        // File (0 to 7) of square 
         public static int FileIndex(int squareIndex)
         {
             return squareIndex & 0b000111;
@@ -55,14 +53,14 @@
             return new Coord(FileIndex(squareIndex), RankIndex(squareIndex));
         }
 
-        public static bool LightSquare(int fileIndex, int rankIndex)
+        public static bool IsLightSquare(int fileIndex, int rankIndex)
         {
             return (fileIndex + rankIndex) % 2 != 0;
         }
 
-        public static bool LightSquare(int squareIndex)
+        public static bool IsLightSquare(int squareIndex)
         {
-            return LightSquare(FileIndex(squareIndex), RankIndex(squareIndex));
+            return IsLightSquare(FileIndex(squareIndex), RankIndex(squareIndex));
         }
 
         public static string SquareNameFromCoordinate(int fileIndex, int rankIndex)
@@ -89,14 +87,8 @@
             return IndexFromCoord(fileIndex, rankIndex);
         }
 
-        public static bool IsValidCoordinate(int x, int y) => x >= 0 && x < 8 && y >= 0 && y < 8;
-
-        /// <summary>
-        /// Creates an ASCII-diagram of the current position.
-        /// </summary>
         public static string CreateDiagram(Board board, bool blackAtTop = true, bool includeFen = true, bool includeZobristKey = true)
         {
-            // Thanks to ernestoyaquello
             System.Text.StringBuilder result = new();
             int lastMoveSquare = board.AllGameMoves.Count > 0 ? board.AllGameMoves[^1].TargetSquare : -1;
 
@@ -110,7 +102,7 @@
                     int fileIndex = blackAtTop ? x : 7 - x;
                     int squareIndex = IndexFromCoord(fileIndex, rankIndex);
                     bool highlight = squareIndex == lastMoveSquare;
-                    int piece = board.Square[squareIndex];
+                    int piece = board.Squares[squareIndex];
                     if (highlight)
                     {
                         result.Append($"|({Piece.GetSymbol(piece)})");
@@ -123,14 +115,12 @@
 
                     if (x == 7)
                     {
-                        // Show rank number
                         result.AppendLine($"| {rankIndex + 1}");
                     }
                 }
 
                 if (y == 7)
                 {
-                    // Show file names
                     result.AppendLine("+---+---+---+---+---+---+---+---+");
                     const string fileNames = "  a   b   c   d   e   f   g   h  ";
                     const string fileNamesRev = "  h   g   f   e   d   c   b   a  ";

@@ -50,7 +50,6 @@ namespace chess_engine.UI
             Centre,
             Bottom
         }
-
         public enum HighlightType
         {
             MoveFrom,
@@ -58,7 +57,6 @@ namespace chess_engine.UI
             LegalMove,
             Check
         }
-
 
         public BoardUI()
         {
@@ -91,7 +89,7 @@ namespace chess_engine.UI
             lastMove = Move.NullMove;
             if (board.IsInCheck())
             {
-                OverrideSquareColour(board.KingSquare[board.MoveColourIndex], HighlightType.Check);
+                OverrideSquareColour(board.KingSquares[board.MoveColorIndex], HighlightType.Check);
             }
         }
 
@@ -218,7 +216,7 @@ namespace chess_engine.UI
 
             if (isDraggingPiece)
             {
-                DrawPiece(board.Square[dragSquare], dragPos - new Vector2(squareSize * 0.5f, squareSize * 0.5f));
+                DrawPiece(board.Squares[dragSquare], dragPos - new Vector2(squareSize * 0.5f, squareSize * 0.5f));
             }
 
 
@@ -245,7 +243,7 @@ namespace chess_engine.UI
             Vector2 targetPos = GetSquarePos(targetCoord.fileIndex, targetCoord.rankIndex, whitePerspective);
 
             Vector2 animPos = Vector2.Lerp(startPos, targetPos, (float)animT);
-            DrawPiece(board.Square[moveToAnimate.StartSquare], animPos);
+            DrawPiece(board.Squares[moveToAnimate.StartSquare], animPos);
         }
 
         public void ResetSquareColours(bool keepPrevMoveHighlight = false)
@@ -261,7 +259,7 @@ namespace chess_engine.UI
         {
 
             Coord coord = new Coord(file, rank);
-            Color col = coord.IsLightSquare() ? theme.LightCol : theme.DarkCol;
+            Color col = coord.IsLightSquare() ? theme.LightColor : theme.DarkColor;
             if (squareColOverrides.TryGetValue(coord.SquareIndex, out Color overrideCol))
             {
                 col = overrideCol;
@@ -270,7 +268,7 @@ namespace chess_engine.UI
             // Top Left
             Vector2 pos = GetSquarePos(file, rank, whitePerspective);
             Raylib.DrawRectangle((int)pos.X, (int)pos.Y, squareSize, squareSize, col);
-            int piece = board.Square[coord.SquareIndex];
+            int piece = board.Squares[coord.SquareIndex];
             float alpha = isDraggingPiece && dragSquare == coord.SquareIndex ? 0.3f : 1;
             if (!isAnimatingMove || coord.SquareIndex != moveToAnimate.StartSquare)
             {
@@ -278,7 +276,7 @@ namespace chess_engine.UI
             }
 
             int textSize = 25;
-            Color coordNameCol = coord.IsLightSquare() ? theme.DarkCoordCol : theme.LightCoordCol;
+            Color coordNameCol = coord.IsLightSquare() ? theme.DarkCoordColor : theme.LightCoordColor;
 
             if (rank == (whitePerspective ? 0 : 7))
             {

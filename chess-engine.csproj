@@ -14,7 +14,6 @@
     <None Remove="Assets\move-self.wav" />
     <None Remove="Assets\Pieces.png" />
     <None Remove="Assets\Roboto-Regular.ttf" />
-    <None Remove="settings.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,11 +36,6 @@
     <Content Include="Assets\Roboto-Regular.ttf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="settings.json">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>settings.Designer.cs</LastGenOutput>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -59,6 +53,6 @@
     </EmbeddedResource>
   </ItemGroup>
 
-  <ProjectExtensions><VisualStudio><UserProperties settings_1json__JsonSchema="json" /></VisualStudio></ProjectExtensions>
+  <ProjectExtensions><VisualStudio><UserProperties /></VisualStudio></ProjectExtensions>
 
 </Project>

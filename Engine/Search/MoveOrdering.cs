@@ -56,7 +56,7 @@
             //Move hashMove = inQSearch ? invalidMove : transpositionTable.GetStoredMove();
 
 
-            ulong oppPieces = board.EnemyDiagonalSliders | board.EnemyOrthogonalSliders | board.PieceBitboards[Piece.MakePiece(Piece.Knight, board.OpponentColour)];
+            ulong oppPieces = board.EnemyDiagonalSliders | board.EnemyOrthogonalSliders | board.PieceBitboards[Piece.MakePiece(Piece.Knight, board.OpponentColor)];
             ulong[] pawnAttacks = board.IsWhiteToMove ? BitBoardUtility.WhitePawnAttacks : BitBoardUtility.BlackPawnAttacks;
             //bool danger = board.queens[1 - board.MoveColourIndex].Count > 0 || board.rooks[1 - board.MoveColourIndex].Count > 1;
 
@@ -74,9 +74,9 @@
                 int startSquare = move.StartSquare;
                 int targetSquare = move.TargetSquare;
 
-                int movePiece = board.Square[startSquare];
+                int movePiece = board.Squares[startSquare];
                 int movePieceType = Piece.PieceType(movePiece);
-                int capturePieceType = Piece.PieceType(board.Square[targetSquare]);
+                int capturePieceType = Piece.PieceType(board.Squares[targetSquare]);
                 bool isCapture = capturePieceType != Piece.None;
                 int flag = moves[i].MoveFlag;
                 int pieceValue = GetPieceValue(movePieceType);
@@ -128,7 +128,7 @@
                     //score += regularBias;
                     bool isKiller = !inQSearch && ply < maxKillerMovePly && killerMoves[ply].Match(move);
                     score += isKiller ? killerBias : regularBias;
-                    score += History[board.MoveColourIndex, move.StartSquare, move.TargetSquare];
+                    score += History[board.MoveColorIndex, move.StartSquare, move.TargetSquare];
                 }
 
                 moveScores[i] = score;

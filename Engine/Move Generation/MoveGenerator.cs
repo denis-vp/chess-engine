@@ -91,11 +91,11 @@ namespace chess_engine.Engine
             pinRays = 0;
 
             // Store some info for convenience
-            isWhiteToMove = board.MoveColour == Piece.White;
-            friendlyColour = board.MoveColour;
-            opponentColour = board.OpponentColour;
-            friendlyKingSquare = board.KingSquare[board.MoveColourIndex];
-            friendlyIndex = board.MoveColourIndex;
+            isWhiteToMove = board.MoveColor == Piece.White;
+            friendlyColour = board.MoveColor;
+            opponentColour = board.OpponentColor;
+            friendlyKingSquare = board.KingSquares[board.MoveColorIndex];
+            friendlyIndex = board.MoveColorIndex;
             enemyIndex = 1 - friendlyIndex;
 
             // Store some bitboards for convenience
@@ -202,7 +202,7 @@ namespace chess_engine.Engine
 
         void GenerateKnightMoves(System.Span<Move> moves)
         {
-            int friendlyKnightPiece = Piece.MakePiece(Piece.Knight, board.MoveColour);
+            int friendlyKnightPiece = Piece.MakePiece(Piece.Knight, board.MoveColor);
             // bitboard of all non-pinned knights
             ulong knights = board.PieceBitboards[friendlyKnightPiece] & notPinRays;
             ulong moveMask = emptyOrEnemySquares & checkRayBitmask & moveTypeMask;
@@ -225,7 +225,7 @@ namespace chess_engine.Engine
             int pushDir = board.IsWhiteToMove ? 1 : -1;
             int pushOffset = pushDir * 8;
 
-            int friendlyPawnPiece = Piece.MakePiece(Piece.Pawn, board.MoveColour);
+            int friendlyPawnPiece = Piece.MakePiece(Piece.Pawn, board.MoveColor);
             ulong pawns = board.PieceBitboards[friendlyPawnPiece];
 
             ulong promotionRankMask = board.IsWhiteToMove ? BitBoardUtility.Rank8 : BitBoardUtility.Rank1;
@@ -439,7 +439,7 @@ namespace chess_engine.Engine
                 {
                     int squareIndex = friendlyKingSquare + directionOffset * (i + 1);
                     rayMask |= 1ul << squareIndex;
-                    int piece = board.Square[squareIndex];
+                    int piece = board.Squares[squareIndex];
 
                     // This square contains a piece
                     if (piece != Piece.None)
@@ -497,8 +497,8 @@ namespace chess_engine.Engine
             notPinRays = ~pinRays;
 
             ulong opponentKnightAttacks = 0;
-            ulong knights = board.PieceBitboards[Piece.MakePiece(Piece.Knight, board.OpponentColour)];
-            ulong friendlyKingBoard = board.PieceBitboards[Piece.MakePiece(Piece.King, board.MoveColour)];
+            ulong knights = board.PieceBitboards[Piece.MakePiece(Piece.Knight, board.OpponentColor)];
+            ulong friendlyKingBoard = board.PieceBitboards[Piece.MakePiece(Piece.King, board.MoveColor)];
 
             while (knights != 0)
             {
@@ -518,7 +518,7 @@ namespace chess_engine.Engine
             PieceList opponentPawns = board.Pawns[enemyIndex];
             opponentPawnAttackMap = 0;
 
-            ulong opponentPawnsBoard = board.PieceBitboards[Piece.MakePiece(Piece.Pawn, board.OpponentColour)];
+            ulong opponentPawnsBoard = board.PieceBitboards[Piece.MakePiece(Piece.Pawn, board.OpponentColor)];
             opponentPawnAttackMap = BitBoardUtility.PawnAttacks(opponentPawnsBoard, !isWhiteToMove);
             if (BitBoardUtility.ContainsSquare(opponentPawnAttackMap, friendlyKingSquare))
             {
@@ -529,7 +529,7 @@ namespace chess_engine.Engine
                 checkRayBitmask |= pawnCheckMap;
             }
 
-            int enemyKingSquare = board.KingSquare[enemyIndex];
+            int enemyKingSquare = board.KingSquares[enemyIndex];
 
             opponentAttackMapNoPawns = opponentSlidingAttackMap | opponentKnightAttacks | BitBoardUtility.KingMoves[enemyKingSquare];
             opponentAttackMap = opponentAttackMapNoPawns | opponentPawnAttackMap;

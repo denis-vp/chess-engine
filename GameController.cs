@@ -139,8 +139,7 @@ namespace chess_engine
             }
             else
             {
-                // If the game is over, print the result
-                Console.WriteLine(result);
+                // TODO: Handle game over
             }
         }
 

@@ -9,6 +9,9 @@ namespace chess_engine
 
         public static void Main()
         {
+            // Disable logging
+            Raylib.SetTraceLogLevel(TraceLogLevel.None);
+
             Raylib.InitWindow(Settings.ScreenWidth, Settings.ScreenHeight, "Chess");
 
             Image icon = Raylib.LoadImage(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Resources.IconPath));

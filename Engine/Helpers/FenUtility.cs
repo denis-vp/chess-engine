@@ -2,12 +2,10 @@
 
 namespace chess_engine.Engine
 {
-    // Helper class for dealing with FEN strings
     public static class FenUtility
     {
         public const string StartPositionFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-        // Load position from fen string
         public static PositionInfo PositionFromFen(string fen)
         {
 
@@ -15,11 +13,6 @@ namespace chess_engine.Engine
             return loadedPositionInfo;
         }
 
-        /// <summary>
-        /// Get the fen string of the current position
-        /// When alwaysIncludeEPSquare is true the en passant square will be included
-        /// in the fen string even if no enemy pawn is in a position to capture it.
-        /// </summary>
         public static string CurrentFen(Board board, bool alwaysIncludeEPSquare = true)
         {
             string fen = "";
@@ -29,7 +22,7 @@ namespace chess_engine.Engine
                 for (int file = 0; file < 8; file++)
                 {
                     int i = rank * 8 + file;
-                    int piece = board.Square[i];
+                    int piece = board.Squares[i];
                     if (piece != 0)
                     {
                         if (numEmptyFiles != 0)
@@ -115,7 +108,7 @@ namespace chess_engine.Engine
             fen += ' ';
             fen += board.CurrentGameState.fiftyMoveCounter;
 
-            // Full-move count (should be one at start, and increase after each move by black)
+            // Full-move count
             fen += ' ';
             fen += (board.PlyCount / 2) + 1;
 
@@ -127,16 +120,13 @@ namespace chess_engine.Engine
             Coord captureFromA = new Coord(epFileIndex - 1, epRankIndex + (board.IsWhiteToMove ? -1 : 1));
             Coord captureFromB = new Coord(epFileIndex + 1, epRankIndex + (board.IsWhiteToMove ? -1 : 1));
             int epCaptureSquare = new Coord(epFileIndex, epRankIndex).SquareIndex;
-            int friendlyPawn = Piece.MakePiece(Piece.Pawn, board.MoveColour);
-
-
+            int friendlyPawn = Piece.MakePiece(Piece.Pawn, board.MoveColor);
 
             return CanCapture(captureFromA) || CanCapture(captureFromB);
 
-
             bool CanCapture(Coord from)
             {
-                bool isPawnOnSquare = board.Square[from.SquareIndex] == friendlyPawn;
+                bool isPawnOnSquare = board.Squares[from.SquareIndex] == friendlyPawn;
                 if (from.IsValidSquare() && isPawnOnSquare)
                 {
                     Move move = new Move(from.SquareIndex, epCaptureSquare, Move.EnPassantCaptureFlag);
@@ -153,61 +143,6 @@ namespace chess_engine.Engine
             }
         }
 
-        public static string FlipFen(string fen)
-        {
-            string flippedFen = "";
-            string[] sections = fen.Split(' ');
-
-            List<char> invertedFenChars = new();
-            string[] fenRanks = sections[0].Split('/');
-
-            for (int i = fenRanks.Length - 1; i >= 0; i--)
-            {
-                string rank = fenRanks[i];
-                foreach (char c in rank)
-                {
-                    flippedFen += InvertCase(c);
-                }
-                if (i != 0)
-                {
-                    flippedFen += '/';
-                }
-            }
-
-            flippedFen += " " + (sections[1][0] == 'w' ? 'b' : 'w');
-            string castlingRights = sections[2];
-            string flippedRights = "";
-            foreach (char c in "kqKQ")
-            {
-                if (castlingRights.Contains(c))
-                {
-                    flippedRights += InvertCase(c);
-                }
-            }
-            flippedFen += " " + (flippedRights.Length == 0 ? "-" : flippedRights);
-
-            string ep = sections[3];
-            string flippedEp = ep[0] + "";
-            if (ep.Length > 1)
-            {
-                flippedEp += ep[1] == '6' ? '3' : '6';
-            }
-            flippedFen += " " + flippedEp;
-            flippedFen += " " + sections[4] + " " + sections[5];
-
-
-            return flippedFen;
-
-            char InvertCase(char c)
-            {
-                if (char.IsLower(c))
-                {
-                    return char.ToUpper(c);
-                }
-                return char.ToLower(c);
-            }
-        }
-
         public readonly struct PositionInfo
         {
             public readonly string fen;
@@ -221,11 +156,9 @@ namespace chess_engine.Engine
             // En passant file (1 is a-file, 8 is h-file, 0 means none)
             public readonly int epFile;
             public readonly bool whiteToMove;
-            // Number of half-moves since last capture or pawn advance
-            // (starts at 0 and increments after each player's move)
+            // Number of plies since last capture or pawn advance (starts at 0 and increments after each player's move)
             public readonly int fiftyMovePlyCount;
-            // Total number of moves played in the game
-            // (starts at 1 and increments after black's move)
+            // Total number of moves played in the game (starts at 1 and increments after black's move)
             public readonly int moveCount;
 
             public PositionInfo(string fen)
@@ -295,7 +228,7 @@ namespace chess_engine.Engine
                     }
                 }
 
-                // Half-move clock
+                // Ply clock
                 if (sections.Length > 4)
                 {
                     int.TryParse(sections[4], out fiftyMovePlyCount);
