@@ -41,11 +41,11 @@
             var moves = moveGenerator.GenerateMoves(board);
 
             // Look for mate/stalemate
-            if (moves.Length == 0)
+            if (moves.Count == 0)
             {
                 if (moveGenerator.InCheck())
                 {
-                    return (board.IsWhiteToMove) ? GameResult.WhiteIsMated : GameResult.BlackIsMated;
+                    return (board.WhiteToMove) ? GameResult.WhiteIsMated : GameResult.BlackIsMated;
                 }
                 return GameResult.Stalemate;
             }
@@ -80,8 +80,13 @@
                 return false;
             }
 
+            int numWhiteQueens = board.Queens[Board.WhiteIndex].Count;
+            int numBlackQueens = board.Queens[Board.BlackIndex].Count;
+            int numWhiteRooks = board.Rooks[Board.WhiteIndex].Count;
+            int numBlackRooks = board.Rooks[Board.BlackIndex].Count;
+
             // Can't have insufficient material with queens/rooks on the board
-            if (board.FriendlyOrthogonalSliders != 0 || board.EnemyOrthogonalSliders != 0)
+            if (numWhiteQueens > 0 || numBlackQueens > 0 || numWhiteRooks > 0 || numBlackRooks > 0)
             {
                 return false;
             }

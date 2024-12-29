@@ -2,7 +2,8 @@
   "ScreenWidth": 800,
   "ScreenHeight": 800,
   "IsPlayerWhite": true,
-  "BotThinkTimeSeconds": 5,
+  "BotThinkTimeSeconds": 10,
   "MaxBookPly": 16,
-  "InvertPerspective": false
+  "InvertPerspective": false,
+  "EngineVsEngine": true
 }

@@ -1,4 +1,5 @@
-﻿using Raylib_cs;
+﻿using chess_engine.Game;
+using Raylib_cs;
 using System.Numerics;
 
 namespace chess_engine
@@ -23,7 +24,19 @@ namespace chess_engine
 
             UpdateCamera(Settings.ScreenWidth, Settings.ScreenHeight);
 
-            GameController controller = new();
+            GameController controller;
+            if (Settings.EngineVsEngine)
+            {
+                controller = new GameController(GameController.PlayerType.Engine, GameController.PlayerType.Engine);
+            }
+            else if (Settings.IsPlayerWhite)
+            {
+                controller = new GameController(GameController.PlayerType.Human, GameController.PlayerType.Engine);
+            }
+            else
+            {
+                controller = new GameController(GameController.PlayerType.Engine, GameController.PlayerType.Human);
+            }
 
             while (!Raylib.WindowShouldClose())
             {

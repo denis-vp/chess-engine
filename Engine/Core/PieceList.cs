@@ -3,9 +3,9 @@
     public class PieceList
     {
 
-        // Contains the index of the squares ocupied by the given piece type
+        // Indices of squares occupied by given piece type (only elements up to Count are valid, the rest are unused/garbage)
         public int[] occupiedSquares;
-        // Map from index of a square, to the index in the occupiedSquares array where that square is stored
+        // Map to go from index of a square, to the index in the occupiedSquares array where that square is stored
         int[] map;
         int numPieces;
 
@@ -33,19 +33,15 @@
 
         public void RemovePieceAtSquare(int square)
         {
-            // Get the index of this element in the occupiedSquares array
-            int pieceIndex = map[square];
-            // Move last element in array to the place of the removed element
-            occupiedSquares[pieceIndex] = occupiedSquares[numPieces - 1];
-            // Update map to point to the moved element's new location in the array
-            map[occupiedSquares[pieceIndex]] = pieceIndex;
+            int pieceIndex = map[square]; // Get the index of this element in the occupiedSquares array
+            occupiedSquares[pieceIndex] = occupiedSquares[numPieces - 1]; // Move last element in array to the place of the removed element
+            map[occupiedSquares[pieceIndex]] = pieceIndex; // Update map to point to the moved element's new location in the array
             numPieces--;
         }
 
         public void MovePiece(int startSquare, int targetSquare)
         {
-            // Get the index of this element in the occupiedSquares array
-            int pieceIndex = map[startSquare];
+            int pieceIndex = map[startSquare]; // Get the index of this element in the occupiedSquares array
             occupiedSquares[pieceIndex] = targetSquare;
             map[targetSquare] = pieceIndex;
         }

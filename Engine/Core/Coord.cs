@@ -1,6 +1,6 @@
 ﻿namespace chess_engine.Engine
 {
-    public readonly struct Coord
+    public struct Coord
     {
         public readonly int fileIndex;
         public readonly int rankIndex;
@@ -22,12 +22,6 @@
             return (fileIndex + rankIndex) % 2 != 0;
         }
 
-        public static Coord operator +(Coord a, Coord b) => new Coord(a.fileIndex + b.fileIndex, a.rankIndex + b.rankIndex);
-        public static Coord operator -(Coord a, Coord b) => new Coord(a.fileIndex - b.fileIndex, a.rankIndex - b.rankIndex);
-        public static Coord operator *(Coord a, int m) => new Coord(a.fileIndex * m, a.rankIndex * m);
-        public static Coord operator *(int m, Coord a) => a * m;
-
-        public bool IsValidSquare() => fileIndex >= 0 && fileIndex < 8 && rankIndex >= 0 && rankIndex < 8;
         public int SquareIndex => BoardHelper.IndexFromCoord(this);
     }
 }

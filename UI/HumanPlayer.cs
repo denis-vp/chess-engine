@@ -4,7 +4,7 @@ using System.Numerics;
 
 namespace chess_engine.UI
 {
-    internal class Player
+    public class HumanPlayer
     {
         public event Action<Move>? MoveChosen;
 
@@ -16,8 +16,7 @@ namespace chess_engine.UI
         int selectedSquare;
         bool isTurnToMove;
 
-
-        public Player(BoardUI boardUI)
+        public HumanPlayer(BoardUI boardUI)
         {
             board = new();
             board.LoadStartPosition();
@@ -56,7 +55,7 @@ namespace chess_engine.UI
                     // If the square contains a piece of the player's colour
                     // Start dragging the piece
                     int piece = board.Squares[square];
-                    if (Piece.IsColour(piece, board.IsWhiteToMove ? Piece.White : Piece.Black))
+                    if (Piece.IsColor(piece, board.WhiteToMove ? Piece.White : Piece.Black))
                     {
                         isDragging = true;
                         selectedSquare = square;

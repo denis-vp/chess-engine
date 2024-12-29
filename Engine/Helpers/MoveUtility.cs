@@ -1,4 +1,4 @@
-namespace chess_engine.Engine
+﻿namespace chess_engine.Engine
 {
     public static class MoveUtility
     {
@@ -14,7 +14,7 @@ namespace chess_engine.Engine
             Coord targetCoord = new(targetSquare);
 
             // Get corresponding move flag
-            int flag = Move.NoFlag;
+            int flag = Move.Flag.None;
 
             if (movedPieceType == Piece.Pawn)
             {
@@ -23,61 +23,33 @@ namespace chess_engine.Engine
                 {
                     flag = moveName[^1] switch
                     {
-                        'q' => Move.PromoteToQueenFlag,
-                        'r' => Move.PromoteToRookFlag,
-                        'n' => Move.PromoteToKnightFlag,
-                        'b' => Move.PromoteToBishopFlag,
-                        _ => Move.NoFlag
+                        'q' => Move.Flag.PromoteToQueen,
+                        'r' => Move.Flag.PromoteToRook,
+                        'n' => Move.Flag.PromoteToKnight,
+                        'b' => Move.Flag.PromoteToBishop,
+                        _ => Move.Flag.None
                     };
                 }
                 // Double pawn push
                 else if (System.Math.Abs(targetCoord.rankIndex - startCoord.rankIndex) == 2)
                 {
-                    flag = Move.PawnTwoUpFlag;
+                    flag = Move.Flag.PawnTwoForward;
                 }
                 // En-passant
                 else if (startCoord.fileIndex != targetCoord.fileIndex && board.Squares[targetSquare] == Piece.None)
                 {
-                    flag = Move.EnPassantCaptureFlag;
+                    flag = Move.Flag.EnPassantCapture;
                 }
             }
             else if (movedPieceType == Piece.King)
             {
                 if (Math.Abs(startCoord.fileIndex - targetCoord.fileIndex) > 1)
                 {
-                    flag = Move.CastleFlag;
+                    flag = Move.Flag.Castling;
                 }
             }
 
             return new Move(startSquare, targetSquare, flag);
-        }
-
-        /// Get algebraic name of move (with promotion specified)
-        /// Examples: "e2e4", "e7e8q"
-        public static string GetMoveNameUCI(Move move)
-        {
-            string startSquareName = BoardHelper.SquareNameFromIndex(move.StartSquare);
-            string endSquareName = BoardHelper.SquareNameFromIndex(move.TargetSquare);
-            string moveName = startSquareName + endSquareName;
-            if (move.IsPromotion)
-            {
-                switch (move.MoveFlag)
-                {
-                    case Move.PromoteToRookFlag:
-                        moveName += "r";
-                        break;
-                    case Move.PromoteToKnightFlag:
-                        moveName += "n";
-                        break;
-                    case Move.PromoteToBishopFlag:
-                        moveName += "b";
-                        break;
-                    case Move.PromoteToQueenFlag:
-                        moveName += "q";
-                        break;
-                }
-            }
-            return moveName;
         }
     }
 }

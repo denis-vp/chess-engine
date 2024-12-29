@@ -1,121 +1,69 @@
-﻿namespace chess_engine.Engine
-{
-    using System;
-    using static System.Math;
+﻿using static System.Math;
 
+namespace chess_engine.Engine
+{
     public class Searcher
     {
-        // Constants
-        const int transpositionTableSizeMB = 64;
-        const int maxExtentions = 16;
 
+        const int numEntriestranspositionTable = 64000;
         const int immediateMateScore = 100000;
         const int positiveInfinity = 9999999;
         const int negativeInfinity = -positiveInfinity;
+        const int MaxExtensions = 16;
 
-        public event Action<Move>? OnSearchComplete;
+        public event Action<Move> OnSearchComplete;
 
-        // State
-        public Move BestMoveSoFar => bestMove;
-        public int BestEvalSoFar => bestEval;
-        bool isPlayingWhite;
+        TranspositionTable tt;
+        MoveGenerator moveGenerator;
+
         Move bestMoveThisIteration;
         int bestEvalThisIteration;
         Move bestMove;
         int bestEval;
-        bool hasSearchedAtLeastOneMove;
         bool searchCancelled;
 
-        // References
-        readonly TranspositionTable transpositionTable;
-        readonly RepetitionTable repetitionTable;
-        readonly MoveGenerator moveGenerator;
-        readonly MoveOrdering moveOrderer;
-        readonly Evaluation evaluation;
-        readonly Board board;
+        MoveOrdering moveOrdering;
+        Board board;
+        Evaluation evaluation;
 
         public Searcher(Board board)
         {
             this.board = board;
-
             evaluation = new Evaluation();
             moveGenerator = new MoveGenerator();
-            transpositionTable = new TranspositionTable(board, transpositionTableSizeMB);
-            moveOrderer = new MoveOrdering(moveGenerator, transpositionTable);
-            repetitionTable = new RepetitionTable();
-
-            moveGenerator.promotionsToGenerate = MoveGenerator.PromotionMode.QueenAndKnight;
+            tt = new TranspositionTable(board, numEntriestranspositionTable);
+            moveOrdering = new MoveOrdering(moveGenerator);
         }
 
         public void StartSearch()
         {
-            // Initialize search
+            // Initialize search settings
             bestEvalThisIteration = bestEval = 0;
             bestMoveThisIteration = bestMove = Move.NullMove;
+            tt.enabled = true;
 
-            isPlayingWhite = board.IsWhiteToMove;
-
-            moveOrderer.ClearHistory();
-            repetitionTable.Init(board);
-
-            // Initialize debug info
+            moveGenerator.promotionsToGenerate = MoveGenerator.PromotionMode.QueenAndKnight;
             searchCancelled = false;
 
-            // Search
-            RunIterativeDeepeningSearch();
-
-
-            // Finish up
-            // In the unlikely event that the search is cancelled before a best move can be found, take any move
-            if (bestMove.IsNull)
-            {
-                bestMove = moveGenerator.GenerateMoves(board)[0];
-            }
-            OnSearchComplete?.Invoke(bestMove);
-            searchCancelled = false;
-        }
-
-        // Run iterative deepening. This means doing a full search with a depth of 1, then with a depth of 2, and so on.
-        // This allows the search to be cancelled at any time and still yield a useful result.
-        // Thanks to the transposition table and move ordering, this idea is not nearly as terrible as it sounds.
-        void RunIterativeDeepeningSearch()
-        {
             for (int searchDepth = 1; searchDepth <= 256; searchDepth++)
             {
-                hasSearchedAtLeastOneMove = false;
-                Search(searchDepth, 0, negativeInfinity, positiveInfinity);
+                bestMove = Move.NullMove;
+                bestEval = negativeInfinity;
+                SearchMoves(searchDepth, 0, negativeInfinity, positiveInfinity);
 
-                if (searchCancelled)
-                {
-                    if (hasSearchedAtLeastOneMove)
-                    {
-                        bestMove = bestMoveThisIteration;
-                        bestEval = bestEvalThisIteration;
-                    }
-
-                    break;
-                }
-                else
+                if (!Move.IsNullMove(bestMoveThisIteration))
                 {
                     bestMove = bestMoveThisIteration;
                     bestEval = bestEvalThisIteration;
+                }
 
-                    bestEvalThisIteration = int.MinValue;
-                    bestMoveThisIteration = Move.NullMove;
-
-                    // Exit search if found a mate within search depth.
-                    // A mate found outside of search depth (due to extensions) may not be the fastest mate.
-                    if (IsMateScore(bestEval) && NumPlyToMateFromScore(bestEval) <= searchDepth)
-                    {
-                        break;
-                    }
+                if (searchCancelled || IsMateScore(bestEval))
+                {
+                    break;
                 }
             }
-        }
 
-        public (Move move, int eval) GetSearchResult()
-        {
-            return (bestMove, bestEval);
+            OnSearchComplete?.Invoke(bestMove);
         }
 
         public void EndSearch()
@@ -123,8 +71,7 @@
             searchCancelled = true;
         }
 
-
-        int Search(int plyRemaining, int plyFromRoot, int alpha, int beta, int numExtensions = 0, Move prevMove = default, bool prevWasCapture = false)
+        int SearchMoves(int depth, int plyFromRoot, int alpha, int beta, List<Move> moves = null, int numExtensions = 0)
         {
             if (searchCancelled)
             {
@@ -133,25 +80,17 @@
 
             if (plyFromRoot > 0)
             {
-                // Detect draw by three-fold repetition.
-                // (Note: returns a draw score even if this position has only appeared once for sake of simplicity)
-                if (board.CurrentGameState.fiftyMoveCounter >= 100 || repetitionTable.Contains(board.CurrentGameState.zobristKey))
+                // Detect draw by repetition.
+                // Returns a draw score even if this position has only appeared once in the game history (for simplicity).
+                if (board.RepetitionPositionHistory.Contains(board.ZobristKey))
                 {
-                    /*
-					const int contempt = 50;
-					// So long as not in king and pawn ending, prefer a slightly worse position over game ending in a draw
-					if (board.totalPieceCountWithoutPawnsAndKings > 0)
-					{
-						bool isAITurn = board.IsWhiteToMove == aiPlaysWhite;
-						return isAITurn ? -contempt : contempt;
-					}
-					*/
                     return 0;
                 }
 
-                // Skip this position if a mating sequence has already been found earlier in the search, which would be shorter
-                // than any mate we could find from here. This is done by observing that alpha can't possibly be worse
-                // (and likewise beta can't  possibly be better) than being mated in the current position.
+                // Skip this position if a mating sequence has already been found earlier in
+                // the search, which would be shorter than any mate we could find from here.
+                // This is done by observing that alpha can't possibly be worse (and likewise
+                // beta can't  possibly be better) than being mated in the current position.
                 alpha = Max(alpha, -immediateMateScore + plyFromRoot);
                 beta = Min(beta, immediateMateScore - plyFromRoot);
                 if (alpha >= beta)
@@ -163,29 +102,31 @@
             // Try looking up the current position in the transposition table.
             // If the same position has already been searched to at least an equal depth
             // to the search we're doing now,we can just use the recorded evaluation.
-            int ttVal = transpositionTable.LookupEvaluation(plyRemaining, plyFromRoot, alpha, beta);
-            if (ttVal != TranspositionTable.LookupFailed)
+            int ttVal = tt.LookupEvaluation(depth, plyFromRoot, alpha, beta);
+            if (ttVal != TranspositionTable.lookupFailed)
             {
                 if (plyFromRoot == 0)
                 {
-                    bestMoveThisIteration = transpositionTable.TryGetStoredMove();
-                    bestEvalThisIteration = transpositionTable.entries[transpositionTable.Index].value;
+                    bestMoveThisIteration = tt.GetStoredMove();
+                    bestEvalThisIteration = tt.entries[tt.Index].value;
                 }
                 return ttVal;
             }
 
-            if (plyRemaining == 0)
+            if (depth == 0)
             {
                 int evaluation = QuiescenceSearch(alpha, beta);
                 return evaluation;
             }
 
-            Span<Move> moves = stackalloc Move[256];
-            moveGenerator.GenerateMoves(board, ref moves, capturesOnly: false);
-            Move prevBestMove = plyFromRoot == 0 ? bestMove : transpositionTable.TryGetStoredMove();
-            moveOrderer.OrderMoves(prevBestMove, board, moves, moveGenerator.opponentAttackMap, moveGenerator.opponentPawnAttackMap, false, plyFromRoot);
+            if (moves == null)
+            {
+                moves = moveGenerator.GenerateMoves(board);
+            }
+            Move prevBestMove = plyFromRoot == 0 ? bestMove : tt.TryGetStoredMove();
+            moveOrdering.OrderMoves(prevBestMove, board, moves);
             // Detect checkmate and stalemate when no legal moves are available
-            if (moves.Length == 0)
+            if (moves.Count == 0)
             {
                 if (moveGenerator.InCheck())
                 {
@@ -198,54 +139,15 @@
                 }
             }
 
-            if (plyFromRoot > 0)
-            {
-                bool wasPawnMove = Piece.PieceType(board.Squares[prevMove.TargetSquare]) == Piece.Pawn;
-                repetitionTable.Push(board.CurrentGameState.zobristKey, prevWasCapture || wasPawnMove);
-            }
-
-            int evaluationBound = TranspositionTable.UpperBound;
+            int evalType = TranspositionTable.UpperBound;
             Move bestMoveInThisPosition = Move.NullMove;
 
-            for (int i = 0; i < moves.Length; i++)
+            for (int i = 0; i < moves.Count; i++)
             {
-                Move move = moves[i];
-                int capturedPieceType = Piece.PieceType(board.Squares[move.TargetSquare]);
-                bool isCapture = capturedPieceType != Piece.None;
                 board.MakeMove(moves[i], inSearch: true);
-
-                // Extend the depth of the search in certain interesting cases
-                int extension = 0;
-                if (numExtensions < maxExtentions)
-                {
-                    int movedPieceType = Piece.PieceType(board.Squares[move.TargetSquare]);
-                    int targetRank = BoardHelper.RankIndex(move.TargetSquare);
-                    if (board.IsInCheck())
-                    {
-                        extension = 1;
-                    }
-                    else if (movedPieceType == Piece.Pawn && (targetRank == 1 || targetRank == 6))
-                    {
-                        extension = 1;
-                    }
-                }
-
-                bool needsFullSearch = true;
-                int eval = 0;
-                // Reduce the depth of the search for moves later in the move list as these are less likely to be good
-                // (assuming our move ordering isn't terrible)
-                if (extension == 0 && plyRemaining >= 3 && i >= 3 && !isCapture)
-                {
-                    const int reduceDepth = 1;
-                    eval = -Search(plyRemaining - 1 - reduceDepth, plyFromRoot + 1, -alpha - 1, -alpha, numExtensions, move, isCapture);
-                    // If the evaluation is better than expected, we'd better to a full-depth search to get a more accurate evaluation
-                    needsFullSearch = eval > alpha;
-                }
-                // Perform a full-depth search
-                if (needsFullSearch)
-                {
-                    eval = -Search(plyRemaining - 1 + extension, plyFromRoot + 1, -beta, -alpha, numExtensions + extension, move, isCapture);
-                }
+                List<Move> opponentMoves = moveGenerator.GenerateMoves(board);
+                int extension = ComputeExtensionDepth(moves[i], numExtensions);
+                int eval = -SearchMoves(depth - 1 + extension, plyFromRoot + 1, -beta, -alpha, opponentMoves, numExtensions + extension);
                 board.UnmakeMove(moves[i], inSearch: true);
 
                 if (searchCancelled)
@@ -253,36 +155,18 @@
                     return 0;
                 }
 
-                // Move was *too* good, opponent will choose a different move earlier on to avoid this position.
-                // (Beta-cutoff / Fail high)
+                // Move was *too* good, so opponent won't allow this position to be reached
+                // (by choosing a different move earlier on). Skip remaining moves.
                 if (eval >= beta)
                 {
-                    // Store evaluation in transposition table. Note that since we're exiting the search early, there may be an
-                    // even better move we haven't looked at yet, and so the current eval is a lower bound on the actual eval.
-                    transpositionTable.StoreEvaluation(plyRemaining, plyFromRoot, beta, TranspositionTable.LowerBound, moves[i]);
-
-                    // Update killer moves and history heuristic (note: don't include captures as theres are ranked highly anyway)
-                    if (!isCapture)
-                    {
-                        if (plyFromRoot < MoveOrdering.maxKillerMovePly)
-                        {
-                            moveOrderer.killerMoves[plyFromRoot].Add(move);
-                        }
-                        int historyScore = plyRemaining * plyRemaining;
-                        moveOrderer.History[board.MoveColorIndex, moves[i].StartSquare, moves[i].TargetSquare] += historyScore;
-                    }
-                    if (plyFromRoot > 0)
-                    {
-                        repetitionTable.TryPop();
-                    }
-
+                    tt.StoreEvaluation(depth, plyFromRoot, beta, TranspositionTable.LowerBound, moves[i]);
                     return beta;
                 }
 
                 // Found a new best move in this position
                 if (eval > alpha)
                 {
-                    evaluationBound = TranspositionTable.Exact;
+                    evalType = TranspositionTable.Exact;
                     bestMoveInThisPosition = moves[i];
 
                     alpha = eval;
@@ -290,17 +174,11 @@
                     {
                         bestMoveThisIteration = moves[i];
                         bestEvalThisIteration = eval;
-                        hasSearchedAtLeastOneMove = true;
                     }
                 }
             }
 
-            if (plyFromRoot > 0)
-            {
-                repetitionTable.TryPop();
-            }
-
-            transpositionTable.StoreEvaluation(plyRemaining, plyFromRoot, alpha, evaluationBound, bestMoveInThisPosition);
+            tt.StoreEvaluation(depth, plyFromRoot, alpha, evalType, bestMoveInThisPosition);
 
             return alpha;
 
@@ -309,10 +187,6 @@
         // Search capture moves until a 'quiet' position is reached.
         int QuiescenceSearch(int alpha, int beta)
         {
-            if (searchCancelled)
-            {
-                return 0;
-            }
             // A player isn't forced to make a capture (typically), so see what the evaluation is without capturing anything.
             // This prevents situations where a player ony has bad captures available from being evaluated as bad,
             // when the player might have good non-capture moves available.
@@ -326,10 +200,9 @@
                 alpha = eval;
             }
 
-            Span<Move> moves = stackalloc Move[128];
-            moveGenerator.GenerateMoves(board, ref moves, capturesOnly: true);
-            moveOrderer.OrderMoves(Move.NullMove, board, moves, moveGenerator.opponentAttackMap, moveGenerator.opponentPawnAttackMap, true, 0);
-            for (int i = 0; i < moves.Length; i++)
+            var moves = moveGenerator.GenerateMoves(board, false);
+            moveOrdering.OrderMoves(Move.NullMove, board, moves);
+            for (int i = 0; i < moves.Count; i++)
             {
                 board.MakeMove(moves[i], true);
                 eval = -QuiescenceSearch(-beta, -alpha);
@@ -348,43 +221,29 @@
             return alpha;
         }
 
-
         public static bool IsMateScore(int score)
         {
-            if (score == int.MinValue)
-            {
-                return false;
-            }
             const int maxMateDepth = 1000;
             return Abs(score) > immediateMateScore - maxMateDepth;
         }
 
-        public static int NumPlyToMateFromScore(int score)
+        int ComputeExtensionDepth(Move movePlayed, int numExtensions)
         {
-            return immediateMateScore - Abs(score);
-
-        }
-
-        public string AnnounceMate()
-        {
-            if (IsMateScore(bestEvalThisIteration))
+            int movedPieceType = Piece.PieceType(board.Squares[movePlayed.StartSquare]);
+            int targetRank = BoardHelper.RankIndex(movePlayed.TargetSquare);
+            int extension = 0;
+            if (numExtensions < MaxExtensions)
             {
-                int numPlyToMate = NumPlyToMateFromScore(bestEvalThisIteration);
-                int numMovesToMate = (int)Ceiling(numPlyToMate / 2f);
-
-                string sideWithMate = (bestEvalThisIteration * ((board.IsWhiteToMove) ? 1 : -1) < 0) ? "Black" : "White";
-
-                return $"{sideWithMate} can mate in {numMovesToMate} move{((numMovesToMate > 1) ? "s" : "")}";
+                if (moveGenerator.InCheck())
+                {
+                    extension = 1;
+                }
+                else if (movedPieceType == Piece.Pawn && (targetRank == 6 || targetRank == 1))
+                {
+                    extension = 1;
+                }
             }
-            return "No mate found";
+            return extension;
         }
-
-        public void ClearForNewPosition()
-        {
-            transpositionTable.Clear();
-            moveOrderer.ClearKillers();
-        }
-
-        public TranspositionTable GetTranspositionTable() => transpositionTable;
     }
 }

@@ -2,7 +2,6 @@
 {
     public static class PieceSquareTable
     {
-
         public static int Read(int[] table, int square, bool isWhite)
         {
             if (isWhite)
@@ -10,18 +9,13 @@
                 int file = BoardHelper.FileIndex(square);
                 int rank = BoardHelper.RankIndex(square);
                 rank = 7 - rank;
-                square = BoardHelper.IndexFromCoord(file, rank);
+                square = rank * 8 + file;
             }
 
             return table[square];
         }
 
-        public static int Read(int piece, int square)
-        {
-            return Tables[piece][square];
-        }
-
-        public static readonly int[] Pawns = {
+        public static readonly int[] PawnsStart = {
              0,   0,   0,   0,   0,   0,   0,   0,
             50,  50,  50,  50,  50,  50,  50,  50,
             10,  10,  20,  30,  30,  20,  10,  10,
@@ -106,35 +100,5 @@
             -30, -25,   0,   0,   0,   0, -25, -30,
             -50, -30, -30, -30, -30, -30, -30, -50
         };
-        public static readonly int[][] Tables;
-
-        static PieceSquareTable()
-        {
-            Tables = new int[Piece.MaxPieceIndex + 1][];
-            Tables[Piece.MakePiece(Piece.Pawn, Piece.White)] = Pawns;
-            Tables[Piece.MakePiece(Piece.Rook, Piece.White)] = Rooks;
-            Tables[Piece.MakePiece(Piece.Knight, Piece.White)] = Knights;
-            Tables[Piece.MakePiece(Piece.Bishop, Piece.White)] = Bishops;
-            Tables[Piece.MakePiece(Piece.Queen, Piece.White)] = Queens;
-
-            Tables[Piece.MakePiece(Piece.Pawn, Piece.Black)] = GetFlippedTable(Pawns);
-            Tables[Piece.MakePiece(Piece.Rook, Piece.Black)] = GetFlippedTable(Rooks);
-            Tables[Piece.MakePiece(Piece.Knight, Piece.Black)] = GetFlippedTable(Knights);
-            Tables[Piece.MakePiece(Piece.Bishop, Piece.Black)] = GetFlippedTable(Bishops);
-            Tables[Piece.MakePiece(Piece.Queen, Piece.Black)] = GetFlippedTable(Queens);
-        }
-
-        static int[] GetFlippedTable(int[] table)
-        {
-            int[] flippedTable = new int[table.Length];
-
-            for (int i = 0; i < table.Length; i++)
-            {
-                Coord coord = new Coord(i);
-                Coord flippedCoord = new Coord(coord.fileIndex, 7 - coord.rankIndex);
-                flippedTable[flippedCoord.SquareIndex] = table[i];
-            }
-            return flippedTable;
-        }
     }
 }

@@ -4,7 +4,7 @@
     public class TranspositionTable
     {
 
-        public const int LookupFailed = -1;
+        public const int lookupFailed = int.MinValue;
 
         // The value for this position is the exact evaluation
         public const int Exact = 0;
@@ -21,20 +21,16 @@
 
         public Entry[] entries;
 
-        public readonly ulong count;
+        public readonly ulong size;
         public bool enabled = true;
         Board board;
 
-        public TranspositionTable(Board board, int sizeMB)
+        public TranspositionTable(Board board, int size)
         {
             this.board = board;
+            this.size = (ulong)size;
 
-            int ttEntrySizeBytes = System.Runtime.InteropServices.Marshal.SizeOf<TranspositionTable.Entry>();
-            int desiredTableSizeInBytes = sizeMB * 1024 * 1024;
-            int numEntries = desiredTableSizeInBytes / ttEntrySizeBytes;
-
-            count = (ulong)(numEntries);
-            entries = new Entry[numEntries];
+            entries = new Entry[size];
         }
 
         public void Clear()
@@ -49,34 +45,24 @@
         {
             get
             {
-                return board.CurrentGameState.zobristKey % count;
+                return board.ZobristKey % size;
             }
         }
 
-        public Move TryGetStoredMove()
+        public Move GetStoredMove()
         {
             return entries[Index].move;
-        }
-
-
-
-
-
-        public bool TryLookupEvaluation(int depth, int plyFromRoot, int alpha, int beta, out int eval)
-        {
-            eval = 0;
-            return false;
         }
 
         public int LookupEvaluation(int depth, int plyFromRoot, int alpha, int beta)
         {
             if (!enabled)
             {
-                return LookupFailed;
+                return lookupFailed;
             }
             Entry entry = entries[Index];
 
-            if (entry.key == board.CurrentGameState.zobristKey)
+            if (entry.key == board.ZobristKey)
             {
                 // Only use stored evaluation if it has been searched to at least the same depth as would be searched now
                 if (entry.depth >= depth)
@@ -100,7 +86,7 @@
                     }
                 }
             }
-            return LookupFailed;
+            return lookupFailed;
         }
 
         public void StoreEvaluation(int depth, int numPlySearched, int eval, int evalType, Move move)
@@ -109,10 +95,9 @@
             {
                 return;
             }
-            ulong index = Index;
-
+            //ulong index = Index;
             //if (depth >= entries[Index].depth) {
-            Entry entry = new Entry(board.CurrentGameState.zobristKey, CorrectMateScoreForStorage(eval, numPlySearched), (byte)depth, (byte)evalType, move);
+            Entry entry = new Entry(board.ZobristKey, CorrectMateScoreForStorage(eval, numPlySearched), (byte)depth, (byte)evalType, move);
             entries[Index] = entry;
             //}
         }
@@ -137,9 +122,9 @@
             return score;
         }
 
-        public Entry GetEntry(ulong zobristKey)
+        public Move TryGetStoredMove()
         {
-            return entries[zobristKey % (ulong)entries.Length];
+            return entries[Index].move;
         }
 
         public struct Entry

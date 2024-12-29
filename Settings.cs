@@ -10,6 +10,7 @@ namespace chess_engine
         public static int BotThinkTimeSeconds { get; private set; } = 5;
         public static int MaxBookPly { get; private set; } = 16;
         public static bool InvertPerspective { get; private set; } = false;
+        public static bool EngineVsEngine { get; private set; } = false;
 
         private static readonly string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
@@ -30,6 +31,7 @@ namespace chess_engine
                 BotThinkTimeSeconds = settings.BotThinkTimeSeconds;
                 MaxBookPly = settings.MaxBookPly;
                 InvertPerspective = settings.InvertPerspective;
+                EngineVsEngine = settings.EngineVsEngine;
             }
         }
 
@@ -41,6 +43,7 @@ namespace chess_engine
             public int BotThinkTimeSeconds { get; set; } = 5;
             public int MaxBookPly { get; set; } = 16;
             public bool InvertPerspective { get; set; } = false;
+            public bool EngineVsEngine { get; set; } = false;
         }
     }
 }

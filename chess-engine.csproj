@@ -14,6 +14,7 @@
     <None Remove="Assets\move-self.wav" />
     <None Remove="Assets\Pieces.png" />
     <None Remove="Assets\Roboto-Regular.ttf" />
+    <None Remove="settings.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,6 +35,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Assets\Roboto-Regular.ttf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="settings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

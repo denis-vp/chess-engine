@@ -18,7 +18,7 @@ namespace chess_engine.UI
         Vector2 dragPos;
 
         // Board assets
-        static readonly int[] pieceImageOrder = { 5, 3, 2, 4, 1, 0 };
+        static readonly int[] pieceImageOrder = { 0, 5, 3, -999, 2, 4, 1 };
         Texture2D piecesTexture;
         BoardTheme theme;
         Dictionary<int, Color> squareColOverrides;
@@ -115,7 +115,7 @@ namespace chess_engine.UI
             {
                 UpdatePosition(board);
 
-                if (!moveMade.IsNull)
+                if (!moveMade.IsInvalid)
                 {
                     HighlightMove(moveMade);
                     lastMove = moveMade;
@@ -249,7 +249,7 @@ namespace chess_engine.UI
         public void ResetSquareColours(bool keepPrevMoveHighlight = false)
         {
             squareColOverrides.Clear();
-            if (keepPrevMoveHighlight && !lastMove.IsNull)
+            if (keepPrevMoveHighlight && !lastMove.IsInvalid)
             {
                 HighlightMove(lastMove);
             }

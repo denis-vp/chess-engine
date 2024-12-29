@@ -1,361 +1,133 @@
-namespace chess_engine.Engine
+﻿namespace chess_engine.Engine
 {
     using static PrecomputedMoveData;
 
     public class MoveGenerator
     {
-        public const int MaxMoves = 218;
-        //public enum PromotionMode { All, QueenOnly, QueenAndKnight }
+
         public enum PromotionMode { All, QueenOnly, QueenAndKnight }
 
         public PromotionMode promotionsToGenerate = PromotionMode.All;
 
-        // ---- Instance variables ----
-        bool isWhiteToMove;
+        List<Move> moves;
         int friendlyColour;
         int opponentColour;
         int friendlyKingSquare;
-        int friendlyIndex;
-        int enemyIndex;
+        int friendlyColourIndex;
+        int opponentColourIndex;
 
         bool inCheck;
         bool inDoubleCheck;
-
-        // If in check, this bitboard contains squares in line from checking piece up to king
-        // If not in check, all bits are set to 1
+        bool pinsExistInPosition;
         ulong checkRayBitmask;
-
-        ulong pinRays;
-        ulong notPinRays;
+        ulong pinRayBitmask;
+        ulong opponentKnightAttacks;
         ulong opponentAttackMapNoPawns;
         public ulong opponentAttackMap;
         public ulong opponentPawnAttackMap;
         ulong opponentSlidingAttackMap;
 
-        bool generateQuietMoves;
+        bool genQuiets;
         Board board;
-        int currMoveIndex;
 
-        ulong enemyPieces;
-        ulong friendlyPieces;
-        ulong allPieces;
-        ulong emptySquares;
-        ulong emptyOrEnemySquares;
-        // If only captures should be generated, this will have 1s only in positions of enemy pieces.
-        // Otherwise it will have 1s everywhere.
-        ulong moveTypeMask;
-
-        public Span<Move> GenerateMoves(Board board, bool capturesOnly = false)
-        {
-            Span<Move> moves = new Move[MaxMoves];
-            GenerateMoves(board, ref moves, capturesOnly);
-            return moves;
-        }
-
-        // Generates list of legal moves in current position.
-        // Quiet moves (non captures) can optionally be excluded. This is used in quiescence search.
-        public int GenerateMoves(Board board, ref Span<Move> moves, bool capturesOnly = false)
-        {
-            this.board = board;
-            generateQuietMoves = !capturesOnly;
-
-            Init();
-
-            GenerateKingMoves(moves);
-
-            // Only king moves are valid in a double check position, so can return early.
-            if (!inDoubleCheck)
-            {
-                GenerateSlidingMoves(moves);
-                GenerateKnightMoves(moves);
-                GeneratePawnMoves(moves);
-            }
-
-            moves = moves.Slice(0, currMoveIndex);
-            return moves.Length;
-        }
-
-        // Note, this will only return correct value after GenerateMoves() has been called in the current position
         public bool InCheck()
         {
+            // Note, this will only return correct value after GenerateMoves() has been called in the current position
             return inCheck;
         }
 
         void Init()
         {
-            // Reset state
-            currMoveIndex = 0;
+            moves = new List<Move>(64);
             inCheck = false;
             inDoubleCheck = false;
+            pinsExistInPosition = false;
             checkRayBitmask = 0;
-            pinRays = 0;
+            pinRayBitmask = 0;
 
-            // Store some info for convenience
-            isWhiteToMove = board.MoveColor == Piece.White;
-            friendlyColour = board.MoveColor;
+            friendlyColour = board.ColorToMove;
             opponentColour = board.OpponentColor;
-            friendlyKingSquare = board.KingSquares[board.MoveColorIndex];
-            friendlyIndex = board.MoveColorIndex;
-            enemyIndex = 1 - friendlyIndex;
-
-            // Store some bitboards for convenience
-            enemyPieces = board.ColourBitboards[enemyIndex];
-            friendlyPieces = board.ColourBitboards[friendlyIndex];
-            allPieces = board.AllPiecesBitboard;
-            emptySquares = ~allPieces;
-            emptyOrEnemySquares = emptySquares | enemyPieces;
-            moveTypeMask = generateQuietMoves ? ulong.MaxValue : enemyPieces;
-
-            CalculateAttackData();
+            friendlyKingSquare = board.KingSquares[board.ColorToMoveIndex];
+            friendlyColourIndex = (board.WhiteToMove) ? Board.WhiteIndex : Board.BlackIndex;
+            opponentColourIndex = 1 - friendlyColourIndex;
         }
 
-        void GenerateKingMoves(System.Span<Move> moves)
+        public List<Move> GenerateMoves(Board board, bool includeQuietMoves = true)
         {
-            ulong legalMask = ~(opponentAttackMap | friendlyPieces);
-            ulong kingMoves = BitBoardUtility.KingMoves[friendlyKingSquare] & legalMask & moveTypeMask;
-            while (kingMoves != 0)
+            this.board = board;
+            genQuiets = includeQuietMoves;
+            Init();
+
+            ComputeAttackData();
+            GenerateKingMoves();
+
+            // Only king moves are valid in a double check position, so can return early.
+            if (inDoubleCheck)
             {
-                int targetSquare = BitBoardUtility.PopLSB(ref kingMoves);
-                moves[currMoveIndex++] = new Move(friendlyKingSquare, targetSquare);
+                return moves;
             }
 
-            // Castling
-            if (!inCheck && generateQuietMoves)
+            GenerateSlidingMoves();
+            GenerateKnightMoves();
+            GeneratePawnMoves();
+
+            return moves;
+        }
+
+        void GenerateKingMoves()
+        {
+            for (int i = 0; i < kingMoves[friendlyKingSquare].Length; i++)
             {
-                ulong castleBlockers = opponentAttackMap | board.AllPiecesBitboard;
-                if (board.CurrentGameState.HasKingsideCastleRight(board.IsWhiteToMove))
+                int targetSquare = kingMoves[friendlyKingSquare][i];
+                int pieceOnTargetSquare = board.Squares[targetSquare];
+
+                // Skip squares occupied by friendly pieces
+                if (Piece.IsColor(pieceOnTargetSquare, friendlyColour))
                 {
-                    ulong castleMask = board.IsWhiteToMove ? Bits.WhiteKingsideMask : Bits.BlackKingsideMask;
-                    if ((castleMask & castleBlockers) == 0)
+                    continue;
+                }
+
+                bool isCapture = Piece.IsColor(pieceOnTargetSquare, opponentColour);
+                if (!isCapture)
+                {
+                    // King can't move to square marked as under enemy control, unless he is capturing that piece
+                    // Also skip if not generating quiet moves
+                    if (!genQuiets || SquareIsInCheckRay(targetSquare))
                     {
-                        int targetSquare = board.IsWhiteToMove ? BoardHelper.g1 : BoardHelper.g8;
-                        moves[currMoveIndex++] = new Move(friendlyKingSquare, targetSquare, Move.CastleFlag);
-                    }
-                }
-                if (board.CurrentGameState.HasQueensideCastleRight(board.IsWhiteToMove))
-                {
-                    ulong castleMask = board.IsWhiteToMove ? Bits.WhiteQueensideMask2 : Bits.BlackQueensideMask2;
-                    ulong castleBlockMask = board.IsWhiteToMove ? Bits.WhiteQueensideMask : Bits.BlackQueensideMask;
-                    if ((castleMask & castleBlockers) == 0 && (castleBlockMask & board.AllPiecesBitboard) == 0)
-                    {
-                        int targetSquare = board.IsWhiteToMove ? BoardHelper.c1 : BoardHelper.c8;
-                        moves[currMoveIndex++] = new Move(friendlyKingSquare, targetSquare, Move.CastleFlag);
-                    }
-                }
-            }
-        }
-
-        void GenerateSlidingMoves(System.Span<Move> moves)
-        {
-            // Limit movement to empty or enemy squares, and must block check if king is in check.
-            ulong moveMask = emptyOrEnemySquares & checkRayBitmask & moveTypeMask;
-
-            ulong othogonalSliders = board.FriendlyOrthogonalSliders;
-            ulong diagonalSliders = board.FriendlyDiagonalSliders;
-
-            // Pinned pieces cannot move if king is in check
-            if (inCheck)
-            {
-                othogonalSliders &= ~pinRays;
-                diagonalSliders &= ~pinRays;
-            }
-
-            // Ortho
-            while (othogonalSliders != 0)
-            {
-                int startSquare = BitBoardUtility.PopLSB(ref othogonalSliders);
-                ulong moveSquares = Magic.GetRookAttacks(startSquare, allPieces) & moveMask;
-
-                // If piece is pinned, it can only move along the pin ray
-                if (IsPinned(startSquare))
-                {
-                    moveSquares &= alignMask[startSquare, friendlyKingSquare];
-                }
-
-                while (moveSquares != 0)
-                {
-                    int targetSquare = BitBoardUtility.PopLSB(ref moveSquares);
-                    moves[currMoveIndex++] = new Move(startSquare, targetSquare);
-                }
-            }
-
-            // Diag
-            while (diagonalSliders != 0)
-            {
-                int startSquare = BitBoardUtility.PopLSB(ref diagonalSliders);
-                ulong moveSquares = Magic.GetBishopAttacks(startSquare, allPieces) & moveMask;
-
-                // If piece is pinned, it can only move along the pin ray
-                if (IsPinned(startSquare))
-                {
-                    moveSquares &= alignMask[startSquare, friendlyKingSquare];
-                }
-
-                while (moveSquares != 0)
-                {
-                    int targetSquare = BitBoardUtility.PopLSB(ref moveSquares);
-                    moves[currMoveIndex++] = new Move(startSquare, targetSquare);
-                }
-            }
-        }
-
-
-        void GenerateKnightMoves(System.Span<Move> moves)
-        {
-            int friendlyKnightPiece = Piece.MakePiece(Piece.Knight, board.MoveColor);
-            // bitboard of all non-pinned knights
-            ulong knights = board.PieceBitboards[friendlyKnightPiece] & notPinRays;
-            ulong moveMask = emptyOrEnemySquares & checkRayBitmask & moveTypeMask;
-
-            while (knights != 0)
-            {
-                int knightSquare = BitBoardUtility.PopLSB(ref knights);
-                ulong moveSquares = BitBoardUtility.KnightAttacks[knightSquare] & moveMask;
-
-                while (moveSquares != 0)
-                {
-                    int targetSquare = BitBoardUtility.PopLSB(ref moveSquares);
-                    moves[currMoveIndex++] = new Move(knightSquare, targetSquare);
-                }
-            }
-        }
-
-        void GeneratePawnMoves(System.Span<Move> moves)
-        {
-            int pushDir = board.IsWhiteToMove ? 1 : -1;
-            int pushOffset = pushDir * 8;
-
-            int friendlyPawnPiece = Piece.MakePiece(Piece.Pawn, board.MoveColor);
-            ulong pawns = board.PieceBitboards[friendlyPawnPiece];
-
-            ulong promotionRankMask = board.IsWhiteToMove ? BitBoardUtility.Rank8 : BitBoardUtility.Rank1;
-
-            ulong singlePush = (BitBoardUtility.Shift(pawns, pushOffset)) & emptySquares;
-
-            ulong pushPromotions = singlePush & promotionRankMask & checkRayBitmask;
-
-
-            ulong captureEdgeFileMask = board.IsWhiteToMove ? BitBoardUtility.notAFile : BitBoardUtility.notHFile;
-            ulong captureEdgeFileMask2 = board.IsWhiteToMove ? BitBoardUtility.notHFile : BitBoardUtility.notAFile;
-            ulong captureA = BitBoardUtility.Shift(pawns & captureEdgeFileMask, pushDir * 7) & enemyPieces;
-            ulong captureB = BitBoardUtility.Shift(pawns & captureEdgeFileMask2, pushDir * 9) & enemyPieces;
-
-            ulong singlePushNoPromotions = singlePush & ~promotionRankMask & checkRayBitmask;
-
-            ulong capturePromotionsA = captureA & promotionRankMask & checkRayBitmask;
-            ulong capturePromotionsB = captureB & promotionRankMask & checkRayBitmask;
-
-            captureA &= checkRayBitmask & ~promotionRankMask;
-            captureB &= checkRayBitmask & ~promotionRankMask;
-
-            // Single / double push
-            if (generateQuietMoves)
-            {
-                // Generate single pawn pushes
-                while (singlePushNoPromotions != 0)
-                {
-                    int targetSquare = BitBoardUtility.PopLSB(ref singlePushNoPromotions);
-                    int startSquare = targetSquare - pushOffset;
-                    if (!IsPinned(startSquare) || alignMask[startSquare, friendlyKingSquare] == alignMask[targetSquare, friendlyKingSquare])
-                    {
-                        moves[currMoveIndex++] = new Move(startSquare, targetSquare);
+                        continue;
                     }
                 }
 
-                // Generate double pawn pushes
-                ulong doublePushTargetRankMask = board.IsWhiteToMove ? BitBoardUtility.Rank4 : BitBoardUtility.Rank5;
-                ulong doublePush = BitBoardUtility.Shift(singlePush, pushOffset) & emptySquares & doublePushTargetRankMask & checkRayBitmask;
-
-                while (doublePush != 0)
+                // Safe for king to move to this square
+                if (!SquareIsAttacked(targetSquare))
                 {
-                    int targetSquare = BitBoardUtility.PopLSB(ref doublePush);
-                    int startSquare = targetSquare - pushOffset * 2;
-                    if (!IsPinned(startSquare) || alignMask[startSquare, friendlyKingSquare] == alignMask[targetSquare, friendlyKingSquare])
+                    moves.Add(new Move(friendlyKingSquare, targetSquare));
+
+                    // Castling:
+                    if (!inCheck && !isCapture)
                     {
-                        moves[currMoveIndex++] = new Move(startSquare, targetSquare, Move.PawnTwoUpFlag);
-                    }
-                }
-            }
-
-            // Captures
-            while (captureA != 0)
-            {
-                int targetSquare = BitBoardUtility.PopLSB(ref captureA);
-                int startSquare = targetSquare - pushDir * 7;
-
-                if (!IsPinned(startSquare) || alignMask[startSquare, friendlyKingSquare] == alignMask[targetSquare, friendlyKingSquare])
-                {
-                    moves[currMoveIndex++] = new Move(startSquare, targetSquare);
-                }
-            }
-
-            while (captureB != 0)
-            {
-                int targetSquare = BitBoardUtility.PopLSB(ref captureB);
-                int startSquare = targetSquare - pushDir * 9;
-
-                if (!IsPinned(startSquare) || alignMask[startSquare, friendlyKingSquare] == alignMask[targetSquare, friendlyKingSquare])
-                {
-                    moves[currMoveIndex++] = new Move(startSquare, targetSquare);
-                }
-            }
-
-
-
-            // Promotions
-            while (pushPromotions != 0)
-            {
-                int targetSquare = BitBoardUtility.PopLSB(ref pushPromotions);
-                int startSquare = targetSquare - pushOffset;
-                if (!IsPinned(startSquare))
-                {
-                    GeneratePromotions(startSquare, targetSquare, moves);
-                }
-            }
-
-
-            while (capturePromotionsA != 0)
-            {
-                int targetSquare = BitBoardUtility.PopLSB(ref capturePromotionsA);
-                int startSquare = targetSquare - pushDir * 7;
-
-                if (!IsPinned(startSquare) || alignMask[startSquare, friendlyKingSquare] == alignMask[targetSquare, friendlyKingSquare])
-                {
-                    GeneratePromotions(startSquare, targetSquare, moves);
-                }
-            }
-
-            while (capturePromotionsB != 0)
-            {
-                int targetSquare = BitBoardUtility.PopLSB(ref capturePromotionsB);
-                int startSquare = targetSquare - pushDir * 9;
-
-                if (!IsPinned(startSquare) || alignMask[startSquare, friendlyKingSquare] == alignMask[targetSquare, friendlyKingSquare])
-                {
-                    GeneratePromotions(startSquare, targetSquare, moves);
-                }
-            }
-
-            // En passant
-            if (board.CurrentGameState.enPassantFile > 0)
-            {
-                int epFileIndex = board.CurrentGameState.enPassantFile - 1;
-                int epRankIndex = board.IsWhiteToMove ? 5 : 2;
-                int targetSquare = epRankIndex * 8 + epFileIndex;
-                int capturedPawnSquare = targetSquare - pushOffset;
-
-                if (BitBoardUtility.ContainsSquare(checkRayBitmask, capturedPawnSquare))
-                {
-                    ulong pawnsThatCanCaptureEp = pawns & BitBoardUtility.PawnAttacks(1ul << targetSquare, !board.IsWhiteToMove);
-
-                    while (pawnsThatCanCaptureEp != 0)
-                    {
-                        int startSquare = BitBoardUtility.PopLSB(ref pawnsThatCanCaptureEp);
-                        if (!IsPinned(startSquare) || alignMask[startSquare, friendlyKingSquare] == alignMask[targetSquare, friendlyKingSquare])
+                        // Castle kingside
+                        if ((targetSquare == BoardHelper.f1 || targetSquare == BoardHelper.f8) && HasKingsideCastleRight)
                         {
-                            if (!InCheckAfterEnPassant(startSquare, targetSquare, capturedPawnSquare))
+                            int castleKingsideSquare = targetSquare + 1;
+                            if (board.Squares[castleKingsideSquare] == Piece.None)
                             {
-                                moves[currMoveIndex++] = new Move(startSquare, targetSquare, Move.EnPassantCaptureFlag);
+                                if (!SquareIsAttacked(castleKingsideSquare))
+                                {
+                                    moves.Add(new Move(friendlyKingSquare, castleKingsideSquare, Move.Flag.Castling));
+                                }
+                            }
+                        }
+                        // Castle queenside
+                        else if ((targetSquare == BoardHelper.d1 || targetSquare == BoardHelper.d8) && HasQueensideCastleRight)
+                        {
+                            int castleQueensideSquare = targetSquare - 1;
+                            if (board.Squares[castleQueensideSquare] == Piece.None && board.Squares[castleQueensideSquare - 1] == Piece.None)
+                            {
+                                if (!SquareIsAttacked(castleQueensideSquare))
+                                {
+                                    moves.Add(new Move(friendlyKingSquare, castleQueensideSquare, Move.Flag.Castling));
+                                }
                             }
                         }
                     }
@@ -363,72 +135,331 @@ namespace chess_engine.Engine
             }
         }
 
-        void GeneratePromotions(int startSquare, int targetSquare, Span<Move> moves)
+        void GenerateSlidingMoves()
         {
-            moves[currMoveIndex++] = new Move(startSquare, targetSquare, Move.PromoteToQueenFlag);
-            // Don't generate non-queen promotions in q-search
-            if (generateQuietMoves)
+            PieceList rooks = board.Rooks[friendlyColourIndex];
+            for (int i = 0; i < rooks.Count; i++)
             {
-                if (promotionsToGenerate == MoveGenerator.PromotionMode.All)
+                GenerateSlidingPieceMoves(rooks[i], 0, 4);
+            }
+
+            PieceList bishops = board.Bishops[friendlyColourIndex];
+            for (int i = 0; i < bishops.Count; i++)
+            {
+                GenerateSlidingPieceMoves(bishops[i], 4, 8);
+            }
+
+            PieceList queens = board.Queens[friendlyColourIndex];
+            for (int i = 0; i < queens.Count; i++)
+            {
+                GenerateSlidingPieceMoves(queens[i], 0, 8);
+            }
+
+        }
+
+        void GenerateSlidingPieceMoves(int startSquare, int startDirIndex, int endDirIndex)
+        {
+            bool isPinned = IsPinned(startSquare);
+
+            // If this piece is pinned, and the king is in check, this piece cannot move
+            if (inCheck && isPinned)
+            {
+                return;
+            }
+
+            for (int directionIndex = startDirIndex; directionIndex < endDirIndex; directionIndex++)
+            {
+                int currentDirOffset = directionOffsets[directionIndex];
+
+                // If pinned, this piece can only move along the ray towards/away from the friendly king, so skip other directions
+                if (isPinned && !IsMovingAlongRay(currentDirOffset, friendlyKingSquare, startSquare))
                 {
-                    moves[currMoveIndex++] = new Move(startSquare, targetSquare, Move.PromoteToKnightFlag);
-                    moves[currMoveIndex++] = new Move(startSquare, targetSquare, Move.PromoteToRookFlag);
-                    moves[currMoveIndex++] = new Move(startSquare, targetSquare, Move.PromoteToBishopFlag);
+                    continue;
                 }
-                else if (promotionsToGenerate == MoveGenerator.PromotionMode.QueenAndKnight)
+
+                for (int n = 0; n < numSquaresToEdge[startSquare][directionIndex]; n++)
                 {
-                    moves[currMoveIndex++] = new Move(startSquare, targetSquare, Move.PromoteToKnightFlag);
+                    int targetSquare = startSquare + currentDirOffset * (n + 1);
+                    int targetSquarePiece = board.Squares[targetSquare];
+
+                    // Blocked by friendly piece, so stop looking in this direction
+                    if (Piece.IsColor(targetSquarePiece, friendlyColour))
+                    {
+                        break;
+                    }
+                    bool isCapture = targetSquarePiece != Piece.None;
+
+                    bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
+                    if (movePreventsCheck || !inCheck)
+                    {
+                        if (genQuiets || isCapture)
+                        {
+                            moves.Add(new Move(startSquare, targetSquare));
+                        }
+                    }
+                    // If square not empty, can't move any further in this direction
+                    // Also, if this move blocked a check, further moves won't block the check
+                    if (isCapture || movePreventsCheck)
+                    {
+                        break;
+                    }
                 }
             }
         }
 
+        void GenerateKnightMoves()
+        {
+            PieceList myKnights = board.Knights[friendlyColourIndex];
+
+            for (int i = 0; i < myKnights.Count; i++)
+            {
+                int startSquare = myKnights[i];
+
+                // Knight cannot move if it is pinned
+                if (IsPinned(startSquare))
+                {
+                    continue;
+                }
+
+                for (int knightMoveIndex = 0; knightMoveIndex < knightMoves[startSquare].Length; knightMoveIndex++)
+                {
+                    int targetSquare = knightMoves[startSquare][knightMoveIndex];
+                    int targetSquarePiece = board.Squares[targetSquare];
+                    bool isCapture = Piece.IsColor(targetSquarePiece, opponentColour);
+                    if (genQuiets || isCapture)
+                    {
+                        // Skip if square contains friendly piece, or if in check and knight is not interposing/capturing checking piece
+                        if (Piece.IsColor(targetSquarePiece, friendlyColour) || (inCheck && !SquareIsInCheckRay(targetSquare)))
+                        {
+                            continue;
+                        }
+                        moves.Add(new Move(startSquare, targetSquare));
+                    }
+                }
+            }
+        }
+
+        void GeneratePawnMoves()
+        {
+            PieceList myPawns = board.Pawns[friendlyColourIndex];
+            int pawnOffset = (friendlyColour == Piece.White) ? 8 : -8;
+            int startRank = (board.WhiteToMove) ? 1 : 6;
+            int finalRankBeforePromotion = (board.WhiteToMove) ? 6 : 1;
+
+            int enPassantFile = ((int)(board.CurrentGameState >> 4) & 0b1111) - 1;
+            int enPassantSquare = -1;
+            if (enPassantFile != -1)
+            {
+                enPassantSquare = 8 * ((board.WhiteToMove) ? 5 : 2) + enPassantFile;
+            }
+
+            for (int i = 0; i < myPawns.Count; i++)
+            {
+                int startSquare = myPawns[i];
+                int rank = BoardHelper.RankIndex(startSquare);
+                bool oneStepFromPromotion = rank == finalRankBeforePromotion;
+
+                if (genQuiets)
+                {
+
+                    int squareOneForward = startSquare + pawnOffset;
+
+                    // Square ahead of pawn is empty: forward moves
+                    if (board.Squares[squareOneForward] == Piece.None)
+                    {
+                        // Pawn not pinned, or is moving along line of pin
+                        if (!IsPinned(startSquare) || IsMovingAlongRay(pawnOffset, startSquare, friendlyKingSquare))
+                        {
+                            // Not in check, or pawn is interposing checking piece
+                            if (!inCheck || SquareIsInCheckRay(squareOneForward))
+                            {
+                                if (oneStepFromPromotion)
+                                {
+                                    MakePromotionMoves(startSquare, squareOneForward);
+                                }
+                                else
+                                {
+                                    moves.Add(new Move(startSquare, squareOneForward));
+                                }
+                            }
+
+                            // Is on starting square (so can move two forward if not blocked)
+                            if (rank == startRank)
+                            {
+                                int squareTwoForward = squareOneForward + pawnOffset;
+                                if (board.Squares[squareTwoForward] == Piece.None)
+                                {
+                                    // Not in check, or pawn is interposing checking piece
+                                    if (!inCheck || SquareIsInCheckRay(squareTwoForward))
+                                    {
+                                        moves.Add(new Move(startSquare, squareTwoForward, Move.Flag.PawnTwoForward));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Pawn captures.
+                for (int j = 0; j < 2; j++)
+                {
+                    // Check if square exists diagonal to pawn
+                    if (numSquaresToEdge[startSquare][pawnAttackDirections[friendlyColourIndex][j]] > 0)
+                    {
+                        // move in direction friendly pawns attack to get square from which enemy pawn would attack
+                        int pawnCaptureDir = directionOffsets[pawnAttackDirections[friendlyColourIndex][j]];
+                        int targetSquare = startSquare + pawnCaptureDir;
+                        int targetPiece = board.Squares[targetSquare];
+
+                        // If piece is pinned, and the square it wants to move to is not on same line as the pin, then skip this direction
+                        if (IsPinned(startSquare) && !IsMovingAlongRay(pawnCaptureDir, friendlyKingSquare, startSquare))
+                        {
+                            continue;
+                        }
+
+                        // Regular capture
+                        if (Piece.IsColor(targetPiece, opponentColour))
+                        {
+                            // If in check, and piece is not capturing/interposing the checking piece, then skip to next square
+                            if (inCheck && !SquareIsInCheckRay(targetSquare))
+                            {
+                                continue;
+                            }
+                            if (oneStepFromPromotion)
+                            {
+                                MakePromotionMoves(startSquare, targetSquare);
+                            }
+                            else
+                            {
+                                moves.Add(new Move(startSquare, targetSquare));
+                            }
+                        }
+
+                        // Capture en-passant
+                        if (targetSquare == enPassantSquare)
+                        {
+                            int epCapturedPawnSquare = targetSquare + ((board.WhiteToMove) ? -8 : 8);
+                            if (!InCheckAfterEnPassant(startSquare, targetSquare, epCapturedPawnSquare))
+                            {
+                                moves.Add(new Move(startSquare, targetSquare, Move.Flag.EnPassantCapture));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        void MakePromotionMoves(int fromSquare, int toSquare)
+        {
+            moves.Add(new Move(fromSquare, toSquare, Move.Flag.PromoteToQueen));
+            if (promotionsToGenerate == PromotionMode.All)
+            {
+                moves.Add(new Move(fromSquare, toSquare, Move.Flag.PromoteToKnight));
+                moves.Add(new Move(fromSquare, toSquare, Move.Flag.PromoteToRook));
+                moves.Add(new Move(fromSquare, toSquare, Move.Flag.PromoteToBishop));
+            }
+            else if (promotionsToGenerate == PromotionMode.QueenAndKnight)
+            {
+                moves.Add(new Move(fromSquare, toSquare, Move.Flag.PromoteToKnight));
+            }
+
+        }
+
+        bool IsMovingAlongRay(int rayDir, int startSquare, int targetSquare)
+        {
+            int moveDir = directionLookup[targetSquare - startSquare + 63];
+            return (rayDir == moveDir || -rayDir == moveDir);
+        }
+
         bool IsPinned(int square)
         {
-            return ((pinRays >> square) & 1) != 0;
+            return pinsExistInPosition && ((pinRayBitmask >> square) & 1) != 0;
+        }
+
+        bool SquareIsInCheckRay(int square)
+        {
+            return inCheck && ((checkRayBitmask >> square) & 1) != 0;
+        }
+
+        bool HasKingsideCastleRight
+        {
+            get
+            {
+                int mask = (board.WhiteToMove) ? 1 : 4;
+                return (board.CurrentGameState & mask) != 0;
+            }
+        }
+
+        bool HasQueensideCastleRight
+        {
+            get
+            {
+                int mask = (board.WhiteToMove) ? 2 : 8;
+                return (board.CurrentGameState & mask) != 0;
+            }
         }
 
         void GenSlidingAttackMap()
         {
             opponentSlidingAttackMap = 0;
 
-            UpdateSlideAttack(board.EnemyOrthogonalSliders, true);
-            UpdateSlideAttack(board.EnemyDiagonalSliders, false);
-
-            void UpdateSlideAttack(ulong pieceBoard, bool ortho)
+            PieceList enemyRooks = board.Rooks[opponentColourIndex];
+            for (int i = 0; i < enemyRooks.Count; i++)
             {
-                ulong blockers = board.AllPiecesBitboard & ~(1ul << friendlyKingSquare);
+                UpdateSlidingAttackPiece(enemyRooks[i], 0, 4);
+            }
 
-                while (pieceBoard != 0)
+            PieceList enemyQueens = board.Queens[opponentColourIndex];
+            for (int i = 0; i < enemyQueens.Count; i++)
+            {
+                UpdateSlidingAttackPiece(enemyQueens[i], 0, 8);
+            }
+
+            PieceList enemyBishops = board.Bishops[opponentColourIndex];
+            for (int i = 0; i < enemyBishops.Count; i++)
+            {
+                UpdateSlidingAttackPiece(enemyBishops[i], 4, 8);
+            }
+        }
+
+        void UpdateSlidingAttackPiece(int startSquare, int startDirIndex, int endDirIndex)
+        {
+
+            for (int directionIndex = startDirIndex; directionIndex < endDirIndex; directionIndex++)
+            {
+                int currentDirOffset = directionOffsets[directionIndex];
+                for (int n = 0; n < numSquaresToEdge[startSquare][directionIndex]; n++)
                 {
-                    int startSquare = BitBoardUtility.PopLSB(ref pieceBoard);
-                    ulong moveBoard = Magic.GetSliderAttacks(startSquare, blockers, ortho);
-
-                    opponentSlidingAttackMap |= moveBoard;
+                    int targetSquare = startSquare + currentDirOffset * (n + 1);
+                    int targetSquarePiece = board.Squares[targetSquare];
+                    opponentSlidingAttackMap |= 1ul << targetSquare;
+                    if (targetSquare != friendlyKingSquare)
+                    {
+                        if (targetSquarePiece != Piece.None)
+                        {
+                            break;
+                        }
+                    }
                 }
             }
         }
 
-        void CalculateAttackData()
+        void ComputeAttackData()
         {
             GenSlidingAttackMap();
             // Search squares in all directions around friendly king for checks/pins by enemy sliding pieces (queen, rook, bishop)
             int startDirIndex = 0;
             int endDirIndex = 8;
 
-            if (board.Queens[enemyIndex].Count == 0)
+            if (board.Queens[opponentColourIndex].Count == 0)
             {
-                startDirIndex = (board.Rooks[enemyIndex].Count > 0) ? 0 : 4;
-                endDirIndex = (board.Bishops[enemyIndex].Count > 0) ? 8 : 4;
+                startDirIndex = (board.Rooks[opponentColourIndex].Count > 0) ? 0 : 4;
+                endDirIndex = (board.Bishops[opponentColourIndex].Count > 0) ? 8 : 4;
             }
 
             for (int dir = startDirIndex; dir < endDirIndex; dir++)
             {
                 bool isDiagonal = dir > 3;
-                ulong slider = isDiagonal ? board.EnemyDiagonalSliders : board.EnemyOrthogonalSliders;
-                if ((dirRayMask[dir, friendlyKingSquare] & slider) == 0)
-                {
-                    continue;
-                }
 
                 int n = numSquaresToEdge[friendlyKingSquare][dir];
                 int directionOffset = directionOffsets[dir];
@@ -444,7 +475,7 @@ namespace chess_engine.Engine
                     // This square contains a piece
                     if (piece != Piece.None)
                     {
-                        if (Piece.IsColour(piece, friendlyColour))
+                        if (Piece.IsColor(piece, friendlyColour))
                         {
                             // First friendly piece we have come across in this direction, so it might be pinned
                             if (!isFriendlyPieceAlongRay)
@@ -463,12 +494,13 @@ namespace chess_engine.Engine
                             int pieceType = Piece.PieceType(piece);
 
                             // Check if piece is in bitmask of pieces able to move in current direction
-                            if (isDiagonal && Piece.IsDiagonalSlider(pieceType) || !isDiagonal && Piece.IsOrthogonalSlider(pieceType))
+                            if (isDiagonal && Piece.IsBishopOrQueen(pieceType) || !isDiagonal && Piece.IsRookOrQueen(pieceType))
                             {
                                 // Friendly piece blocks the check, so this is a pin
                                 if (isFriendlyPieceAlongRay)
                                 {
-                                    pinRays |= rayMask;
+                                    pinsExistInPosition = true;
+                                    pinRayBitmask |= rayMask;
                                 }
                                 // No friendly piece blocking the attack, so this is a check
                                 else
@@ -492,70 +524,131 @@ namespace chess_engine.Engine
                 {
                     break;
                 }
+
             }
 
-            notPinRays = ~pinRays;
+            // Knight attacks
+            PieceList opponentKnights = board.Knights[opponentColourIndex];
+            opponentKnightAttacks = 0;
+            bool isKnightCheck = false;
 
-            ulong opponentKnightAttacks = 0;
-            ulong knights = board.PieceBitboards[Piece.MakePiece(Piece.Knight, board.OpponentColor)];
-            ulong friendlyKingBoard = board.PieceBitboards[Piece.MakePiece(Piece.King, board.MoveColor)];
-
-            while (knights != 0)
+            for (int knightIndex = 0; knightIndex < opponentKnights.Count; knightIndex++)
             {
-                int knightSquare = BitBoardUtility.PopLSB(ref knights);
-                ulong knightAttacks = BitBoardUtility.KnightAttacks[knightSquare];
-                opponentKnightAttacks |= knightAttacks;
+                int startSquare = opponentKnights[knightIndex];
+                opponentKnightAttacks |= knightAttackBitboards[startSquare];
 
-                if ((knightAttacks & friendlyKingBoard) != 0)
+                if (!isKnightCheck && BitBoardUtility.ContainsSquare(opponentKnightAttacks, friendlyKingSquare))
                 {
-                    inDoubleCheck = inCheck;
+                    isKnightCheck = true;
+                    inDoubleCheck = inCheck; // if already in check, then this is double check
                     inCheck = true;
-                    checkRayBitmask |= 1ul << knightSquare;
+                    checkRayBitmask |= 1ul << startSquare;
                 }
             }
 
             // Pawn attacks
-            PieceList opponentPawns = board.Pawns[enemyIndex];
+            PieceList opponentPawns = board.Pawns[opponentColourIndex];
             opponentPawnAttackMap = 0;
+            bool isPawnCheck = false;
 
-            ulong opponentPawnsBoard = board.PieceBitboards[Piece.MakePiece(Piece.Pawn, board.OpponentColor)];
-            opponentPawnAttackMap = BitBoardUtility.PawnAttacks(opponentPawnsBoard, !isWhiteToMove);
-            if (BitBoardUtility.ContainsSquare(opponentPawnAttackMap, friendlyKingSquare))
+            for (int pawnIndex = 0; pawnIndex < opponentPawns.Count; pawnIndex++)
             {
-                inDoubleCheck = inCheck; // if already in check, then this is double check
-                inCheck = true;
-                ulong possiblePawnAttackOrigins = board.IsWhiteToMove ? BitBoardUtility.WhitePawnAttacks[friendlyKingSquare] : BitBoardUtility.BlackPawnAttacks[friendlyKingSquare];
-                ulong pawnCheckMap = opponentPawnsBoard & possiblePawnAttackOrigins;
-                checkRayBitmask |= pawnCheckMap;
+                int pawnSquare = opponentPawns[pawnIndex];
+                ulong pawnAttacks = pawnAttackBitboards[pawnSquare][opponentColourIndex];
+                opponentPawnAttackMap |= pawnAttacks;
+
+                if (!isPawnCheck && BitBoardUtility.ContainsSquare(pawnAttacks, friendlyKingSquare))
+                {
+                    isPawnCheck = true;
+                    inDoubleCheck = inCheck; // if already in check, then this is double check
+                    inCheck = true;
+                    checkRayBitmask |= 1ul << pawnSquare;
+                }
             }
 
-            int enemyKingSquare = board.KingSquares[enemyIndex];
+            int enemyKingSquare = board.KingSquares[opponentColourIndex];
 
-            opponentAttackMapNoPawns = opponentSlidingAttackMap | opponentKnightAttacks | BitBoardUtility.KingMoves[enemyKingSquare];
+            opponentAttackMapNoPawns = opponentSlidingAttackMap | opponentKnightAttacks | kingAttackBitboards[enemyKingSquare];
             opponentAttackMap = opponentAttackMapNoPawns | opponentPawnAttackMap;
-
-            if (!inCheck)
-            {
-                checkRayBitmask = ulong.MaxValue;
-            }
         }
 
-        // Test if capturing a pawn with en-passant reveals a sliding piece attack against the king
-        // Note: this is only used for cases where pawn appears to not be pinned due to opponent pawn being on same rank
-        // (therefore only need to check orthogonal sliders)
-        bool InCheckAfterEnPassant(int startSquare, int targetSquare, int epCaptureSquare)
+        bool SquareIsAttacked(int square)
         {
-            ulong enemyOrtho = board.EnemyOrthogonalSliders;
+            return BitBoardUtility.ContainsSquare(opponentAttackMap, square);
+        }
 
-            if (enemyOrtho != 0)
+        bool InCheckAfterEnPassant(int startSquare, int targetSquare, int epCapturedPawnSquare)
+        {
+            // Update board to reflect en-passant capture
+            board.Squares[targetSquare] = board.Squares[startSquare];
+            board.Squares[startSquare] = Piece.None;
+            board.Squares[epCapturedPawnSquare] = Piece.None;
+
+            bool inCheckAfterEpCapture = false;
+            if (SquareAttackedAfterEPCapture(epCapturedPawnSquare, startSquare))
             {
-                ulong maskedBlockers = (allPieces ^ (1ul << epCaptureSquare | 1ul << startSquare | 1ul << targetSquare));
-                ulong rookAttacks = Magic.GetRookAttacks(friendlyKingSquare, maskedBlockers);
-                return (rookAttacks & enemyOrtho) != 0;
+                inCheckAfterEpCapture = true;
+            }
+
+            // Undo change to board
+            board.Squares[targetSquare] = Piece.None;
+            board.Squares[startSquare] = Piece.Pawn | friendlyColour;
+            board.Squares[epCapturedPawnSquare] = Piece.Pawn | opponentColour;
+            return inCheckAfterEpCapture;
+        }
+
+        bool SquareAttackedAfterEPCapture(int epCaptureSquare, int capturingPawnStartSquare)
+        {
+            if (BitBoardUtility.ContainsSquare(opponentAttackMapNoPawns, friendlyKingSquare))
+            {
+                return true;
+            }
+
+            // Loop through the horizontal direction towards ep capture to see if any enemy piece now attacks king
+            int dirIndex = (epCaptureSquare < friendlyKingSquare) ? 2 : 3;
+            for (int i = 0; i < numSquaresToEdge[friendlyKingSquare][dirIndex]; i++)
+            {
+                int squareIndex = friendlyKingSquare + directionOffsets[dirIndex] * (i + 1);
+                int piece = board.Squares[squareIndex];
+                if (piece != Piece.None)
+                {
+                    // Friendly piece is blocking view of this square from the enemy.
+                    if (Piece.IsColor(piece, friendlyColour))
+                    {
+                        break;
+                    }
+                    // This square contains an enemy piece
+                    else
+                    {
+                        if (Piece.IsRookOrQueen(piece))
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            // This piece is not able to move in the current direction, and is therefore blocking any checks along this line
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // check if enemy pawn is controlling this square (can't use pawn attack bitboard, because pawn has been captured)
+            for (int i = 0; i < 2; i++)
+            {
+                // Check if square exists diagonal to friendly king from which enemy pawn could be attacking it
+                if (numSquaresToEdge[friendlyKingSquare][pawnAttackDirections[friendlyColourIndex][i]] > 0)
+                {
+                    // move in direction friendly pawns attack to get square from which enemy pawn would attack
+                    int piece = board.Squares[friendlyKingSquare + directionOffsets[pawnAttackDirections[friendlyColourIndex][i]]];
+                    if (piece == (Piece.Pawn | opponentColour)) // is enemy pawn
+                    {
+                        return true;
+                    }
+                }
             }
 
             return false;
         }
     }
-
 }

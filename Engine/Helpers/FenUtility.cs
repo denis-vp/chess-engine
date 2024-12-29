@@ -1,15 +1,74 @@
-﻿using System.Collections.ObjectModel;
-
-namespace chess_engine.Engine
+﻿namespace chess_engine.Engine
 {
     public static class FenUtility
     {
-        public const string StartPositionFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-        public static PositionInfo PositionFromFen(string fen)
+        static Dictionary<char, int> pieceTypeFromSymbol = new Dictionary<char, int>()
+        {
+            ['k'] = Piece.King,
+            ['p'] = Piece.Pawn,
+            ['n'] = Piece.Knight,
+            ['b'] = Piece.Bishop,
+            ['r'] = Piece.Rook,
+            ['q'] = Piece.Queen
+        };
+
+        public const string startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+        public static LoadedPositionInfo PositionFromFen(string fen)
         {
 
-            PositionInfo loadedPositionInfo = new(fen);
+            LoadedPositionInfo loadedPositionInfo = new LoadedPositionInfo();
+            string[] sections = fen.Split(' ');
+
+            int file = 0;
+            int rank = 7;
+
+            foreach (char symbol in sections[0])
+            {
+                if (symbol == '/')
+                {
+                    file = 0;
+                    rank--;
+                }
+                else
+                {
+                    if (char.IsDigit(symbol))
+                    {
+                        file += (int)char.GetNumericValue(symbol);
+                    }
+                    else
+                    {
+                        int pieceColor = (char.IsUpper(symbol)) ? Piece.White : Piece.Black;
+                        int pieceType = pieceTypeFromSymbol[char.ToLower(symbol)];
+                        loadedPositionInfo.squares[rank * 8 + file] = pieceType | pieceColor;
+                        file++;
+                    }
+                }
+            }
+
+            loadedPositionInfo.whiteToMove = (sections[1] == "w");
+
+            string castlingRights = (sections.Length > 2) ? sections[2] : "KQkq";
+            loadedPositionInfo.whiteCastleKingside = castlingRights.Contains("K");
+            loadedPositionInfo.whiteCastleQueenside = castlingRights.Contains("Q");
+            loadedPositionInfo.blackCastleKingside = castlingRights.Contains("k");
+            loadedPositionInfo.blackCastleQueenside = castlingRights.Contains("q");
+
+            if (sections.Length > 3)
+            {
+                string enPassantFileName = sections[3][0].ToString();
+                if (BoardHelper.fileNames.Contains(enPassantFileName))
+                {
+                    loadedPositionInfo.epFile = BoardHelper.fileNames.IndexOf(enPassantFileName) + 1;
+                }
+            }
+
+            // Half-move clock
+            if (sections.Length > 4)
+            {
+                int.TryParse(sections[4], out loadedPositionInfo.plyCount);
+            }
             return loadedPositionInfo;
         }
 
@@ -30,7 +89,7 @@ namespace chess_engine.Engine
                             fen += numEmptyFiles;
                             numEmptyFiles = 0;
                         }
-                        bool isBlack = Piece.IsColour(piece, Piece.Black);
+                        bool isBlack = Piece.IsColor(piece, Piece.Black);
                         int pieceType = Piece.PieceType(piece);
                         char pieceChar = ' ';
                         switch (pieceType)
@@ -74,30 +133,29 @@ namespace chess_engine.Engine
 
             // Side to move
             fen += ' ';
-            fen += (board.IsWhiteToMove) ? 'w' : 'b';
+            fen += (board.WhiteToMove) ? 'w' : 'b';
 
             // Castling
-            bool whiteKingside = (board.CurrentGameState.castlingRights & 1) == 1;
-            bool whiteQueenside = (board.CurrentGameState.castlingRights >> 1 & 1) == 1;
-            bool blackKingside = (board.CurrentGameState.castlingRights >> 2 & 1) == 1;
-            bool blackQueenside = (board.CurrentGameState.castlingRights >> 3 & 1) == 1;
+            bool whiteKingside = (board.CurrentGameState & 1) == 1;
+            bool whiteQueenside = (board.CurrentGameState >> 1 & 1) == 1;
+            bool blackKingside = (board.CurrentGameState >> 2 & 1) == 1;
+            bool blackQueenside = (board.CurrentGameState >> 3 & 1) == 1;
             fen += ' ';
             fen += (whiteKingside) ? "K" : "";
             fen += (whiteQueenside) ? "Q" : "";
             fen += (blackKingside) ? "k" : "";
             fen += (blackQueenside) ? "q" : "";
-            fen += ((board.CurrentGameState.castlingRights) == 0) ? "-" : "";
+            fen += ((board.CurrentGameState & 15) == 0) ? "-" : "";
 
             // En-passant
             fen += ' ';
-            int epFileIndex = board.CurrentGameState.enPassantFile - 1;
-            int epRankIndex = (board.IsWhiteToMove) ? 5 : 2;
+            int epFile = (int)(board.CurrentGameState >> 4) & 15;
 
-            bool isEnPassant = epFileIndex != -1;
-            bool includeEP = alwaysIncludeEPSquare || EnPassantCanBeCaptured(epFileIndex, epRankIndex, board);
-            if (isEnPassant && includeEP)
+            if (alwaysIncludeEPSquare && epFile != 0)
             {
-                fen += BoardHelper.SquareNameFromCoordinate(epFileIndex, epRankIndex);
+                string fileName = BoardHelper.fileNames[epFile - 1].ToString();
+                int epRank = (board.WhiteToMove) ? 6 : 3;
+                fen += fileName + epRank;
             }
             else
             {
@@ -106,139 +164,31 @@ namespace chess_engine.Engine
 
             // 50 move counter
             fen += ' ';
-            fen += board.CurrentGameState.fiftyMoveCounter;
+            fen += board.FiftyMoveCounter;
 
-            // Full-move count
+            // Full-move count (should be one at start, and increase after each move by black)
             fen += ' ';
             fen += (board.PlyCount / 2) + 1;
 
             return fen;
         }
 
-        static bool EnPassantCanBeCaptured(int epFileIndex, int epRankIndex, Board board)
+        public class LoadedPositionInfo
         {
-            Coord captureFromA = new Coord(epFileIndex - 1, epRankIndex + (board.IsWhiteToMove ? -1 : 1));
-            Coord captureFromB = new Coord(epFileIndex + 1, epRankIndex + (board.IsWhiteToMove ? -1 : 1));
-            int epCaptureSquare = new Coord(epFileIndex, epRankIndex).SquareIndex;
-            int friendlyPawn = Piece.MakePiece(Piece.Pawn, board.MoveColor);
+            public int[] squares;
+            public bool whiteCastleKingside;
+            public bool whiteCastleQueenside;
+            public bool blackCastleKingside;
+            public bool blackCastleQueenside;
+            public int epFile;
+            public bool whiteToMove;
+            public int plyCount;
 
-            return CanCapture(captureFromA) || CanCapture(captureFromB);
-
-            bool CanCapture(Coord from)
+            public LoadedPositionInfo()
             {
-                bool isPawnOnSquare = board.Squares[from.SquareIndex] == friendlyPawn;
-                if (from.IsValidSquare() && isPawnOnSquare)
-                {
-                    Move move = new Move(from.SquareIndex, epCaptureSquare, Move.EnPassantCaptureFlag);
-                    board.MakeMove(move);
-                    board.MakeNullMove();
-                    bool wasLegalMove = !board.CalculateInCheckState();
-
-                    board.UnmakeNullMove();
-                    board.UnmakeMove(move);
-                    return wasLegalMove;
-                }
-
-                return false;
+                squares = new int[64];
             }
         }
 
-        public readonly struct PositionInfo
-        {
-            public readonly string fen;
-            public readonly ReadOnlyCollection<int> squares;
-
-            // Castling rights
-            public readonly bool whiteCastleKingside;
-            public readonly bool whiteCastleQueenside;
-            public readonly bool blackCastleKingside;
-            public readonly bool blackCastleQueenside;
-            // En passant file (1 is a-file, 8 is h-file, 0 means none)
-            public readonly int epFile;
-            public readonly bool whiteToMove;
-            // Number of plies since last capture or pawn advance (starts at 0 and increments after each player's move)
-            public readonly int fiftyMovePlyCount;
-            // Total number of moves played in the game (starts at 1 and increments after black's move)
-            public readonly int moveCount;
-
-            public PositionInfo(string fen)
-            {
-                this.fen = fen;
-                int[] squarePieces = new int[64];
-
-                string[] sections = fen.Split(' ');
-
-                int file = 0;
-                int rank = 7;
-
-                foreach (char symbol in sections[0])
-                {
-                    if (symbol == '/')
-                    {
-                        file = 0;
-                        rank--;
-                    }
-                    else
-                    {
-                        if (char.IsDigit(symbol))
-                        {
-                            file += (int)char.GetNumericValue(symbol);
-                        }
-                        else
-                        {
-                            int pieceColour = (char.IsUpper(symbol)) ? Piece.White : Piece.Black;
-                            int pieceType = char.ToLower(symbol) switch
-                            {
-                                'k' => Piece.King,
-                                'p' => Piece.Pawn,
-                                'n' => Piece.Knight,
-                                'b' => Piece.Bishop,
-                                'r' => Piece.Rook,
-                                'q' => Piece.Queen,
-                                _ => Piece.None
-                            };
-
-                            squarePieces[rank * 8 + file] = pieceType | pieceColour;
-                            file++;
-                        }
-                    }
-                }
-
-                squares = new(squarePieces);
-
-                whiteToMove = (sections[1] == "w");
-
-                string castlingRights = sections[2];
-                whiteCastleKingside = castlingRights.Contains('K');
-                whiteCastleQueenside = castlingRights.Contains('Q');
-                blackCastleKingside = castlingRights.Contains('k');
-                blackCastleQueenside = castlingRights.Contains('q');
-
-                // Default values
-                epFile = 0;
-                fiftyMovePlyCount = 0;
-                moveCount = 0;
-
-                if (sections.Length > 3)
-                {
-                    string enPassantFileName = sections[3][0].ToString();
-                    if (BoardHelper.fileNames.Contains(enPassantFileName))
-                    {
-                        epFile = BoardHelper.fileNames.IndexOf(enPassantFileName) + 1;
-                    }
-                }
-
-                // Ply clock
-                if (sections.Length > 4)
-                {
-                    int.TryParse(sections[4], out fiftyMovePlyCount);
-                }
-                // Full move number
-                if (sections.Length > 5)
-                {
-                    int.TryParse(sections[5], out moveCount);
-                }
-            }
-        }
     }
 }
