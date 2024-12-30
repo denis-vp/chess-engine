@@ -11,6 +11,7 @@ namespace chess_engine
         public static int MaxBookPly { get; private set; } = 16;
         public static bool InvertPerspective { get; private set; } = false;
         public static bool EngineVsEngine { get; private set; } = false;
+        public static bool PrintSearch { get; private set; } = false;
 
         private static readonly string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
@@ -32,6 +33,7 @@ namespace chess_engine
                 MaxBookPly = settings.MaxBookPly;
                 InvertPerspective = settings.InvertPerspective;
                 EngineVsEngine = settings.EngineVsEngine;
+                PrintSearch = settings.PrintSearch;
             }
         }
 
@@ -44,6 +46,7 @@ namespace chess_engine
             public int MaxBookPly { get; set; } = 16;
             public bool InvertPerspective { get; set; } = false;
             public bool EngineVsEngine { get; set; } = false;
+            public bool PrintSearch { get; set; } = false;
         }
     }
 }

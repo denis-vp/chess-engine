@@ -38,8 +38,8 @@ namespace chess_engine.Engine
         public void StartSearch()
         {
             // Initialize search settings
-            bestEvalThisIteration = bestEval = 0;
             bestMoveThisIteration = bestMove = Move.NullMove;
+            bestEvalThisIteration = bestEval = 0;
             tt.enabled = true;
 
             moveGenerator.promotionsToGenerate = MoveGenerator.PromotionMode.QueenAndKnight;
@@ -47,22 +47,39 @@ namespace chess_engine.Engine
 
             for (int searchDepth = 1; searchDepth <= 256; searchDepth++)
             {
-                bestMove = Move.NullMove;
-                bestEval = negativeInfinity;
+                bestMoveThisIteration = Move.NullMove;
+                bestEvalThisIteration = negativeInfinity;
                 SearchMoves(searchDepth, 0, negativeInfinity, positiveInfinity);
 
                 if (!Move.IsNullMove(bestMoveThisIteration))
                 {
                     bestMove = bestMoveThisIteration;
                     bestEval = bestEvalThisIteration;
+                    if (Settings.PrintSearch)
+                    {
+                        Console.WriteLine($"Depth: {searchDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}");
+                    }
                 }
 
-                if (searchCancelled || IsMateScore(bestEval))
+                if (searchCancelled)
                 {
+                    if (Settings.PrintSearch)
+                    {
+                        Console.WriteLine($"Cancelled, Depth: {searchDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}");
+                    }
                     break;
                 }
             }
 
+            // If search didn't find a move before being cancelled, just play the first move generated
+            if (Move.IsNullMove(bestMove))
+            {
+                bestMove = moveGenerator.GenerateMoves(board)[0];
+                if (Settings.PrintSearch)
+                {
+                    Console.WriteLine($"No move found, playing first move generated: {MoveUtility.GetMoveNameUCI(bestMove)}");
+                }
+            }
             OnSearchComplete?.Invoke(bestMove);
         }
 

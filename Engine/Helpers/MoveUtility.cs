@@ -51,5 +51,31 @@
 
             return new Move(startSquare, targetSquare, flag);
         }
+
+        public static string GetMoveNameUCI(Move move)
+        {
+            string startSquareName = BoardHelper.SquareNameFromIndex(move.StartSquare);
+            string endSquareName = BoardHelper.SquareNameFromIndex(move.TargetSquare);
+            string moveName = startSquareName + endSquareName;
+            if (move.IsPromotion)
+            {
+                switch (move.MoveFlag)
+                {
+                    case Move.Flag.PromoteToRook:
+                        moveName += "r";
+                        break;
+                    case Move.Flag.PromoteToKnight:
+                        moveName += "n";
+                        break;
+                    case Move.Flag.PromoteToBishop:
+                        moveName += "b";
+                        break;
+                    case Move.Flag.PromoteToQueen:
+                        moveName += "q";
+                        break;
+                }
+            }
+            return moveName;
+        }
     }
 }
