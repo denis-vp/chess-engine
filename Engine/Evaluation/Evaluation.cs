@@ -35,8 +35,11 @@
             whiteEval += MopUpEval(Board.WhiteIndex, Board.BlackIndex, whiteMaterial, blackMaterial, blackEndgamePhaseWeight);
             blackEval += MopUpEval(Board.BlackIndex, Board.WhiteIndex, blackMaterial, whiteMaterial, whiteEndgamePhaseWeight);
 
-            whiteEval += EvaluatePieceSquareTables(Board.WhiteIndex, blackEndgamePhaseWeight);
-            blackEval += EvaluatePieceSquareTables(Board.BlackIndex, whiteEndgamePhaseWeight);
+            // Parallelize the evaluations for white and black
+            Parallel.Invoke(
+                () => whiteEval += EvaluatePieceSquareTables(Board.WhiteIndex, blackEndgamePhaseWeight),
+                () => blackEval += EvaluatePieceSquareTables(Board.BlackIndex, whiteEndgamePhaseWeight)
+            );
 
             int eval = whiteEval - blackEval;
 
@@ -83,20 +86,39 @@
         {
             int value = 0;
             bool isWhite = colorIndex == Board.WhiteIndex;
-            value += EvaluatePieceSquareTable(PieceSquareTable.Rooks, board.Rooks[colorIndex], isWhite);
-            value += EvaluatePieceSquareTable(PieceSquareTable.Knights, board.Knights[colorIndex], isWhite);
-            value += EvaluatePieceSquareTable(PieceSquareTable.Bishops, board.Bishops[colorIndex], isWhite);
-            value += EvaluatePieceSquareTable(PieceSquareTable.Queens, board.Queens[colorIndex], isWhite);
 
-            int pawnEarly = EvaluatePieceSquareTable(PieceSquareTable.PawnsStart, board.Pawns[colorIndex], isWhite);
-            int pawnLate = EvaluatePieceSquareTable(PieceSquareTable.PawnsEnd, board.Pawns[colorIndex], isWhite);
-            value += (int)(pawnEarly * (1 - endgamePhaseWeight));
-            value += (int)(pawnLate * endgamePhaseWeight);
+            // Parallelize the piece-square table evaluations
+            int rooksValue = 0, knightsValue = 0, bishopsValue = 0, queensValue = 0, kingEarlyPhase = 0, kingLatePhase = 0;
+            int pawnEarly = 0, pawnLate = 0;
 
-            int kingEarlyPhase = PieceSquareTable.Read(PieceSquareTable.KingStart, board.KingSquares[colorIndex], isWhite);
-            value += (int)(kingEarlyPhase * (1 - endgamePhaseWeight));
-            int kingLatePhase = PieceSquareTable.Read(PieceSquareTable.KingEnd, board.KingSquares[colorIndex], isWhite);
-            value += (int)(kingLatePhase * (endgamePhaseWeight));
+            Parallel.Invoke(
+                () => rooksValue = EvaluatePieceSquareTable(PieceSquareTable.Rooks, board.Rooks[colorIndex], isWhite),
+                () => knightsValue = EvaluatePieceSquareTable(PieceSquareTable.Knights, board.Knights[colorIndex], isWhite),
+                () => bishopsValue = EvaluatePieceSquareTable(PieceSquareTable.Bishops, board.Bishops[colorIndex], isWhite),
+                () => queensValue = EvaluatePieceSquareTable(PieceSquareTable.Queens, board.Queens[colorIndex], isWhite),
+                () =>
+                {
+                    pawnEarly = EvaluatePieceSquareTable(PieceSquareTable.PawnsStart, board.Pawns[colorIndex], isWhite);
+                    pawnEarly = (int)(pawnEarly * (1 - endgamePhaseWeight));
+                },
+                () =>
+                {
+                    pawnLate = EvaluatePieceSquareTable(PieceSquareTable.PawnsEnd, board.Pawns[colorIndex], isWhite);
+                    pawnLate = (int)(pawnLate * endgamePhaseWeight);
+                },
+                () =>
+                {
+                    kingEarlyPhase = PieceSquareTable.Read(PieceSquareTable.KingStart, board.KingSquares[colorIndex], isWhite);
+                    kingEarlyPhase = (int)(kingEarlyPhase * (1 - endgamePhaseWeight));
+                },
+                () =>
+                {
+                    kingLatePhase = PieceSquareTable.Read(PieceSquareTable.KingEnd, board.KingSquares[colorIndex], isWhite);
+                    kingLatePhase = (int)(kingLatePhase * endgamePhaseWeight);
+                }
+            );
+
+            value += rooksValue + knightsValue + bishopsValue + queensValue + kingEarlyPhase + kingLatePhase + pawnEarly + pawnLate;
 
             return value;
         }
