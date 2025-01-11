@@ -1,0 +1,10 @@
+{
+  "ScreenWidth": 1600,
+  "ScreenHeight": 1600,
+  "IsPlayerWhite": true,
+  "BotThinkTimeSeconds": 1,
+  "MaxBookPly": 16,
+  "InvertPerspective": false,
+  "EngineVsEngine": true,
+  "PrintSearch": true
+}
