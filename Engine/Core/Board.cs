@@ -168,7 +168,8 @@
 
         public bool IsInCheck()
         {
-            MoveGenerator moveGenerator = new MoveGenerator();
+
+            AbstractMoveGenerator moveGenerator = Settings.MoveGenerationParallel ? new MoveGeneratorParallel() : new MoveGenerator();
             moveGenerator.GenerateMoves(this, false);
             return moveGenerator.InCheck();
         }

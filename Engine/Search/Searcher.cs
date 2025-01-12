@@ -14,7 +14,7 @@ namespace chess_engine.Engine
         public event Action<Move> OnSearchComplete;
 
         TranspositionTable tt;
-        MoveGenerator moveGenerator;
+        AbstractMoveGenerator moveGenerator;
 
         Move bestMoveThisIteration;
         int bestEvalThisIteration;
@@ -24,13 +24,13 @@ namespace chess_engine.Engine
 
         MoveOrdering moveOrdering;
         Board board;
-        Evaluation evaluation;
+        AbstractEvaluation evaluation;
 
         public Searcher(Board board)
         {
             this.board = board;
-            evaluation = new Evaluation();
-            moveGenerator = new MoveGenerator();
+            evaluation = Settings.EvaluationParallel ? new EvaluationParallel() : new Evaluation();
+            moveGenerator = Settings.MoveGenerationParallel ? new MoveGeneratorParallel() : new MoveGenerator();
             tt = new TranspositionTable(board, numEntriestranspositionTable);
             moveOrdering = new MoveOrdering(moveGenerator);
         }
@@ -42,7 +42,7 @@ namespace chess_engine.Engine
             bestEvalThisIteration = bestEval = 0;
             tt.enabled = true;
 
-            moveGenerator.promotionsToGenerate = MoveGenerator.PromotionMode.QueenAndKnight;
+            moveGenerator.promotionsToGenerate = AbstractMoveGenerator.PromotionMode.QueenAndKnight;
             searchCancelled = false;
 
             for (int searchDepth = 1; searchDepth <= 256; searchDepth++)

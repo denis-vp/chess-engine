@@ -186,7 +186,7 @@ namespace chess_engine.UI
 
         public void HighlightLegalMoves(Board board, int square)
         {
-            MoveGenerator moveGenerator = new();
+            AbstractMoveGenerator moveGenerator = Settings.MoveGenerationParallel ? new MoveGeneratorParallel() : new MoveGenerator();
             var moves = moveGenerator.GenerateMoves(board);
             foreach (var move in moves)
             {

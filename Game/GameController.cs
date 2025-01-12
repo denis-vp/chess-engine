@@ -17,7 +17,7 @@ namespace chess_engine.Game
         ChessPlayer playerToMove => board.WhiteToMove ? playerWhite : playerBlack;
 
         Board board;
-        MoveGenerator moveGenerator;
+        AbstractMoveGenerator moveGenerator;
 
         bool isPlayerTurn;
         bool isWaitingToPlayMove;
@@ -35,7 +35,7 @@ namespace chess_engine.Game
             // Initialize game logic components
             board = new Board();
             board.LoadStartPosition();
-            moveGenerator = new MoveGenerator();
+            moveGenerator = Settings.MoveGenerationParallel ? new MoveGeneratorParallel() : new MoveGenerator();
 
             // Initialize UI components
             boardUI = new BoardUI();

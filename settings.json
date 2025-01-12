@@ -6,5 +6,7 @@
   "MaxBookPly": 16,
   "InvertPerspective": false,
   "EngineVsEngine": true,
-  "PrintSearch": true
+  "PrintSearch": true,
+  "MoveGenerationParallel": false,
+  "EvaluationParallel": false
 }

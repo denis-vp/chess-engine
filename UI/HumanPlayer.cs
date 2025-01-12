@@ -106,7 +106,7 @@ namespace chess_engine.UI
             Move move = Move.NullMove;
 
             // Generate all legal moves and check if the given move is one of them
-            MoveGenerator generator = new();
+            AbstractMoveGenerator generator = Settings.MoveGenerationParallel ? new MoveGeneratorParallel() : new MoveGenerator();
             var legalMoves = generator.GenerateMoves(board);
             foreach (var legalMove in legalMoves)
             {

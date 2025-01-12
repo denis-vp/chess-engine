@@ -12,6 +12,8 @@ namespace chess_engine
         public static bool InvertPerspective { get; private set; } = false;
         public static bool EngineVsEngine { get; private set; } = false;
         public static bool PrintSearch { get; private set; } = false;
+        public static bool MoveGenerationParallel { get; private set; } = true;
+        public static bool EvaluationParallel { get; private set; } = true;
 
         private static readonly string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
@@ -34,6 +36,8 @@ namespace chess_engine
                 InvertPerspective = settings.InvertPerspective;
                 EngineVsEngine = settings.EngineVsEngine;
                 PrintSearch = settings.PrintSearch;
+                MoveGenerationParallel = settings.MoveGenerationParallel;
+                EvaluationParallel = settings.EvaluationParallel;
             }
         }
 
@@ -47,6 +51,8 @@ namespace chess_engine
             public bool InvertPerspective { get; set; } = false;
             public bool EngineVsEngine { get; set; } = false;
             public bool PrintSearch { get; set; } = false;
+            public bool MoveGenerationParallel { get; set; } = true;
+            public bool EvaluationParallel { get; set; } = true;
         }
     }
 }

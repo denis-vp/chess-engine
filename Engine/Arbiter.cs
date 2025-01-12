@@ -37,7 +37,7 @@
 
         public static GameResult GetGameState(Board board)
         {
-            MoveGenerator moveGenerator = new MoveGenerator();
+            AbstractMoveGenerator moveGenerator = Settings.MoveGenerationParallel ? new MoveGeneratorParallel() : new MoveGenerator();
             var moves = moveGenerator.GenerateMoves(board);
 
             // Look for mate/stalemate
