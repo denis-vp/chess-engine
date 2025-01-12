@@ -9,9 +9,9 @@
         const int squareControlledByOpponentPawnPenalty = 350;
         const int capturedPieceValueMultiplier = 10;
 
-        MoveGenerator moveGenerator;
+        AbstractMoveGenerator moveGenerator;
 
-        public MoveOrdering(MoveGenerator moveGenerator)
+        public MoveOrdering(AbstractMoveGenerator moveGenerator)
         {
             moveScores = new int[maxMoveCount];
             this.moveGenerator = moveGenerator;
@@ -38,19 +38,19 @@
 
                     if (flag == Move.Flag.PromoteToQueen)
                     {
-                        score += Evaluation.queenValue;
+                        score += AbstractEvaluation.queenValue;
                     }
                     else if (flag == Move.Flag.PromoteToKnight)
                     {
-                        score += Evaluation.knightValue;
+                        score += AbstractEvaluation.knightValue;
                     }
                     else if (flag == Move.Flag.PromoteToRook)
                     {
-                        score += Evaluation.rookValue;
+                        score += AbstractEvaluation.rookValue;
                     }
                     else if (flag == Move.Flag.PromoteToBishop)
                     {
-                        score += Evaluation.bishopValue;
+                        score += AbstractEvaluation.bishopValue;
                     }
                 }
                 else
@@ -77,15 +77,15 @@
             switch (pieceType)
             {
                 case Piece.Queen:
-                    return Evaluation.queenValue;
+                    return AbstractEvaluation.queenValue;
                 case Piece.Rook:
-                    return Evaluation.rookValue;
+                    return AbstractEvaluation.rookValue;
                 case Piece.Knight:
-                    return Evaluation.knightValue;
+                    return AbstractEvaluation.knightValue;
                 case Piece.Bishop:
-                    return Evaluation.bishopValue;
+                    return AbstractEvaluation.bishopValue;
                 case Piece.Pawn:
-                    return Evaluation.pawnValue;
+                    return AbstractEvaluation.pawnValue;
                 default:
                     return 0;
             }

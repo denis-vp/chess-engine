@@ -1,11 +1,12 @@
 ﻿namespace chess_engine.Engine
 {
+    using System.Collections.Concurrent;
     using static PrecomputedMoveData;
 
-    public class MoveGenerator : AbstractMoveGenerator
+    public class MoveGeneratorParallel : AbstractMoveGenerator
     {
 
-        List<Move> moves;
+        ConcurrentBag<Move> moves;
         int friendlyColour;
         int opponentColour;
         int friendlyKingSquare;
@@ -32,7 +33,7 @@
 
         void Init()
         {
-            moves = new List<Move>(64);
+            moves = new ConcurrentBag<Move>();
             inCheck = false;
             inDoubleCheck = false;
             pinsExistInPosition = false;
@@ -58,14 +59,15 @@
             // Only king moves are valid in a double check position, so can return early.
             if (inDoubleCheck)
             {
-                return moves;
+                return moves.ToList();
             }
 
-            GenerateSlidingMoves();
-            GenerateKnightMoves();
-            GeneratePawnMoves();
+            var slidingTask = Task.Run(() => GenerateSlidingMoves());
+            var knightTask = Task.Run(() => GenerateKnightMoves());
+            var pawnTask = Task.Run(() => GeneratePawnMoves());
 
-            return moves;
+            Task.WaitAll(slidingTask, knightTask, pawnTask);
+            return moves.ToList();
         }
 
         void GenerateKingMoves()
@@ -161,14 +163,14 @@
                 return;
             }
 
-            for (int directionIndex = startDirIndex; directionIndex < endDirIndex; directionIndex++)
+            Parallel.For(startDirIndex, endDirIndex, directionIndex =>
             {
                 int currentDirOffset = directionOffsets[directionIndex];
 
                 // If pinned, this piece can only move along the ray towards/away from the friendly king, so skip other directions
                 if (isPinned && !IsMovingAlongRay(currentDirOffset, friendlyKingSquare, startSquare))
                 {
-                    continue;
+                    return;
                 }
 
                 for (int n = 0; n < numSquaresToEdge[startSquare][directionIndex]; n++)
@@ -198,21 +200,21 @@
                         break;
                     }
                 }
-            }
+            });
         }
 
         void GenerateKnightMoves()
         {
             PieceList myKnights = board.Knights[friendlyColourIndex];
 
-            for (int i = 0; i < myKnights.Count; i++)
+            Parallel.For(0, myKnights.Count, i =>
             {
                 int startSquare = myKnights[i];
 
                 // Knight cannot move if it is pinned
                 if (IsPinned(startSquare))
                 {
-                    continue;
+                    return;
                 }
 
                 for (int knightMoveIndex = 0; knightMoveIndex < knightMoves[startSquare].Length; knightMoveIndex++)
@@ -230,7 +232,7 @@
                         moves.Add(new Move(startSquare, targetSquare));
                     }
                 }
-            }
+            });
         }
 
         void GeneratePawnMoves()
@@ -247,7 +249,7 @@
                 enPassantSquare = 8 * ((board.WhiteToMove) ? 5 : 2) + enPassantFile;
             }
 
-            for (int i = 0; i < myPawns.Count; i++)
+            Parallel.For(0, myPawns.Count, i =>
             {
                 int startSquare = myPawns[i];
                 int rank = BoardHelper.RankIndex(startSquare);
@@ -340,7 +342,7 @@
                         }
                     }
                 }
-            }
+            });
         }
 
         void MakePromotionMoves(int fromSquare, int toSquare)
@@ -398,26 +400,39 @@
             opponentSlidingAttackMap = 0;
 
             PieceList enemyRooks = board.Rooks[opponentColourIndex];
-            for (int i = 0; i < enemyRooks.Count; i++)
-            {
-                UpdateSlidingAttackPiece(enemyRooks[i], 0, 4);
-            }
-
             PieceList enemyQueens = board.Queens[opponentColourIndex];
-            for (int i = 0; i < enemyQueens.Count; i++)
-            {
-                UpdateSlidingAttackPiece(enemyQueens[i], 0, 8);
-            }
-
             PieceList enemyBishops = board.Bishops[opponentColourIndex];
-            for (int i = 0; i < enemyBishops.Count; i++)
+
+            var rookTask = Task.Run(() =>
             {
-                UpdateSlidingAttackPiece(enemyBishops[i], 4, 8);
-            }
+                for (int i = 0; i < enemyRooks.Count; i++)
+                {
+                    UpdateSlidingAttackPiece(enemyRooks[i], 0, 4);
+                }
+            });
+
+            var queenTask = Task.Run(() =>
+            {
+                for (int i = 0; i < enemyQueens.Count; i++)
+                {
+                    UpdateSlidingAttackPiece(enemyQueens[i], 0, 8);
+                }
+            });
+
+            var bishopTask = Task.Run(() =>
+            {
+                for (int i = 0; i < enemyBishops.Count; i++)
+                {
+                    UpdateSlidingAttackPiece(enemyBishops[i], 4, 8);
+                }
+            });
+
+            Task.WaitAll(rookTask, queenTask, bishopTask);
         }
 
         void UpdateSlidingAttackPiece(int startSquare, int startDirIndex, int endDirIndex)
         {
+            ulong localAttackMap = 0;
 
             for (int directionIndex = startDirIndex; directionIndex < endDirIndex; directionIndex++)
             {
@@ -426,7 +441,7 @@
                 {
                     int targetSquare = startSquare + currentDirOffset * (n + 1);
                     int targetSquarePiece = board.Squares[targetSquare];
-                    opponentSlidingAttackMap |= 1ul << targetSquare;
+                    localAttackMap |= 1ul << targetSquare;
                     if (targetSquare != friendlyKingSquare)
                     {
                         if (targetSquarePiece != Piece.None)
@@ -436,6 +451,8 @@
                     }
                 }
             }
+
+            Interlocked.Or(ref opponentSlidingAttackMap, localAttackMap);
         }
 
         void ComputeAttackData()
@@ -521,44 +538,52 @@
 
             }
 
-            // Knight attacks
             PieceList opponentKnights = board.Knights[opponentColourIndex];
-            opponentKnightAttacks = 0;
-            bool isKnightCheck = false;
+            PieceList opponentPawns = board.Pawns[opponentColourIndex];
 
-            for (int knightIndex = 0; knightIndex < opponentKnights.Count; knightIndex++)
+            var knightTask = Task.Run(() =>
             {
-                int startSquare = opponentKnights[knightIndex];
-                opponentKnightAttacks |= knightAttackBitboards[startSquare];
+                opponentKnightAttacks = 0;
+                bool isKnightCheck = false;
 
-                if (!isKnightCheck && BitBoardUtility.ContainsSquare(opponentKnightAttacks, friendlyKingSquare))
+                for (int knightIndex = 0; knightIndex < opponentKnights.Count; knightIndex++)
                 {
-                    isKnightCheck = true;
-                    inDoubleCheck = inCheck; // if already in check, then this is double check
-                    inCheck = true;
-                    checkRayBitmask |= 1ul << startSquare;
+                    int startSquare = opponentKnights[knightIndex];
+                    opponentKnightAttacks |= knightAttackBitboards[startSquare];
+
+                    if (!isKnightCheck && BitBoardUtility.ContainsSquare(opponentKnightAttacks, friendlyKingSquare))
+                    {
+                        isKnightCheck = true;
+                        inDoubleCheck = inCheck; // if already in check, then this is double check
+                        inCheck = true;
+                        checkRayBitmask |= 1ul << startSquare;
+                    }
                 }
-            }
+            });
 
             // Pawn attacks
-            PieceList opponentPawns = board.Pawns[opponentColourIndex];
-            opponentPawnAttackMap = 0;
-            bool isPawnCheck = false;
-
-            for (int pawnIndex = 0; pawnIndex < opponentPawns.Count; pawnIndex++)
+            var pawnTask = Task.Run(() =>
             {
-                int pawnSquare = opponentPawns[pawnIndex];
-                ulong pawnAttacks = pawnAttackBitboards[pawnSquare][opponentColourIndex];
-                opponentPawnAttackMap |= pawnAttacks;
+                opponentPawnAttackMap = 0;
+                bool isPawnCheck = false;
 
-                if (!isPawnCheck && BitBoardUtility.ContainsSquare(pawnAttacks, friendlyKingSquare))
+                for (int pawnIndex = 0; pawnIndex < opponentPawns.Count; pawnIndex++)
                 {
-                    isPawnCheck = true;
-                    inDoubleCheck = inCheck; // if already in check, then this is double check
-                    inCheck = true;
-                    checkRayBitmask |= 1ul << pawnSquare;
+                    int pawnSquare = opponentPawns[pawnIndex];
+                    ulong pawnAttacks = pawnAttackBitboards[pawnSquare][opponentColourIndex];
+                    opponentPawnAttackMap |= pawnAttacks;
+
+                    if (!isPawnCheck && BitBoardUtility.ContainsSquare(pawnAttacks, friendlyKingSquare))
+                    {
+                        isPawnCheck = true;
+                        inDoubleCheck = inCheck; // if already in check, then this is double check
+                        inCheck = true;
+                        checkRayBitmask |= 1ul << pawnSquare;
+                    }
                 }
-            }
+            });
+
+            Task.WaitAll(knightTask, pawnTask);
 
             int enemyKingSquare = board.KingSquares[opponentColourIndex];
 
