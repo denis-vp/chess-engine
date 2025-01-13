@@ -1,6 +1,5 @@
 ﻿namespace chess_engine.Engine
 {
-    // Thanks to https://web.archive.org/web/20071031100051/http://www.brucemo.com/compchess/programming/hashing.htm
     public class TranspositionTable
     {
 

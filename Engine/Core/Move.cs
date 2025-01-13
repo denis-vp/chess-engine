@@ -28,6 +28,12 @@
         const ushort targetSquareMask = 0b0000111111000000;
         const ushort flagMask = 0b1111000000000000;
 
+        public Move Clone()
+        {
+            Move newMove = new Move(this.moveValue);
+            return newMove;
+        }
+        
         public Move(ushort moveValue)
         {
             this.moveValue = moveValue;

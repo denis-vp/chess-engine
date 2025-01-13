@@ -23,15 +23,21 @@
         ulong opponentSlidingAttackMap;
 
         bool genQuiets;
-        Board board;
 
+        override public AbstractMoveGenerator Clone(Board board)
+        {
+            AbstractMoveGenerator newMoveGenerater = new MoveGeneratorParallel();
+            newMoveGenerater.board = board;
+            newMoveGenerater.Init();
+            return newMoveGenerater;
+        }
         override public bool InCheck()
         {
             // Note, this will only return correct value after GenerateMoves() has been called in the current position
             return inCheck;
         }
 
-        void Init()
+        public override void Init()
         {
             moves = new ConcurrentBag<Move>();
             inCheck = false;
