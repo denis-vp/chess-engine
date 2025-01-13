@@ -1,9 +1,8 @@
-﻿using System.Data;
-using static System.Math;
+﻿using static System.Math;
 
 namespace chess_engine.Engine
 {
-    public class Searcher
+    public class SearcherParallel
     {
 
         const int numEntriestranspositionTable = 64000;
@@ -29,7 +28,7 @@ namespace chess_engine.Engine
         MoveOrdering moveOrdering;
         AbstractEvaluation evaluation;
 
-        public Searcher(Board board)
+        public SearcherParallel(Board board)
         {
             this.board = board;
             evaluation = Settings.EvaluationParallel ? new EvaluationParallel() : new Evaluation();

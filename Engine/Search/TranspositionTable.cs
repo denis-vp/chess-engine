@@ -103,7 +103,7 @@
 
         int CorrectMateScoreForStorage(int score, int numPlySearched)
         {
-            if (Searcher.IsMateScore(score))
+            if (SearcherParallel.IsMateScore(score))
             {
                 int sign = System.Math.Sign(score);
                 return (score * sign + numPlySearched) * sign;
@@ -113,7 +113,7 @@
 
         int CorrectRetrievedMateScore(int score, int numPlySearched)
         {
-            if (Searcher.IsMateScore(score))
+            if (SearcherParallel.IsMateScore(score))
             {
                 int sign = System.Math.Sign(score);
                 return (score * sign - numPlySearched) * sign;

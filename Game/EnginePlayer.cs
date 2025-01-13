@@ -5,14 +5,14 @@ namespace chess_engine.Game
     public class EnginePlayer
     {
         Board board;
-        Searcher searcher;
+        SearcherParallel searcher;
         OpeningBook openingBook;
         Action<Move> onMoveChosen;
 
         public EnginePlayer(Board board, Action<Move> onMoveChosen)
         {
             this.board = board;
-            searcher = new Searcher(board);
+            searcher = new SearcherParallel(board);
             searcher.OnSearchComplete += onMoveChosen;
             this.onMoveChosen = onMoveChosen;
             openingBook = new OpeningBook(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Resources.OpeningBookPath)));
