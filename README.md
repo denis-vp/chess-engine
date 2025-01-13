@@ -104,6 +104,14 @@ The `Board` class represents the chessboard, storing piece positions and game st
 3. **Threaded Search**:  
    The `Searcher` class creates multiple threads, each searching at different depths. A countdown event is used to synchronize the threads, ensuring all threads complete before the best move is selected.
 
+
+
+## **Parallelization Outcomes**
+After parallelizing the move generation and evaluation functions, the engine slowed down.
+This is to be expected as the overhead of creating and managing tasks can outweigh the benefits of parallelization for smaller tasks.
+The tasks are lightweight and the overhead of creating and managing them can be significant, especially when the tasks are short-lived.
+
+
 ---
 
 ## **Special Rules Handling**
