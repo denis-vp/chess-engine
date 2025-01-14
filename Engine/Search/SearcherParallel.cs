@@ -80,8 +80,8 @@ namespace chess_engine.Engine
 
             if (Settings.PrintSearch && searchCancelled)
             {
-                Console.WriteLine($"Cancelled, Depth: {bestEvalDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}");
-
+                string colorToMove = board.ColorToMove == Piece.White ? "White" : "Black";
+                Console.WriteLine($"Cancelled, Depth: {bestEvalDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}, Color: {colorToMove}");
             }
 
             // If search didn't find a move before being cancelled, just play the first move generated

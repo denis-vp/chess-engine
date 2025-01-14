@@ -6,22 +6,54 @@ This chess engine is developed in C# and is designed to play chess at a high lev
 
 ---
 
+## **Settings**
+
+Using the `settings.json` file, you can configure various parameters for the app such as:
+- `ScreenWidht` and `ScreenHeight`: The dimensions of the window.
+- `IsPlayerWhite`: Whether the human player is playing as white.
+- `BotThinkTimeSeconds`: The time the bot takes to make a move.
+- `MaxBookPly`: The maximum number of plies to look up in the opening book.
+- `InvertPerspective`: Whether to invert the board perspective.
+- `EngineVsEngine`: Whether to run the engine in engine vs engine mode. This takes precedence over the `IsPlayerWhite` setting.
+- `PrintSearch`: Whether to print search information to the console.
+- `MoveGenerationParallel`: Whether to use parallel move generation.
+- `EvaluationParallel`: Whether to use parallel evaluation.
+- `SearchParallel`: Whether to use parallel search.
+- `PrintMoveGenerationTime`: Whether to print move generation time to the console.
+- `PrintEvaluationTime`: Whether to print evaluation time to the console.
+
+---
+
+## **User Interface (UI)**
+
+The chess engine's user interface is built using **Raylib**, a simple and powerful library designed for graphics rendering and game development. The UI provides an intuitive and visually appealing way to interact with the chess engine.
+
+**Key Features**:
+- **2D Chessboard Rendering**: Displays the board and pieces in a clean, animated 2D interface.
+- **Real-time Interaction**: Users can click and drag pieces to make moves, with legal moves highlighted dynamically.
+- **Customizable Themes**: Allows users to switch between board and piece themes.
+- **AI Integration**: Lets players compete against the engine, showing the engine's "thinking" process visually through the cli (e.g., depth, best move).
+
+Raylib's simplicity and performance make it an ideal choice for creating a responsive and visually appealing UI, enhancing the overall user experience of the chess engine.
+
+---
+
 ## **Key Components**
 
 ### **1. Searcher**
 
-The `Searcher` class is responsible for implementing the core search algorithm (Negamax with Alpha-Beta pruning) to find the best move in a given chess position. It uses iterative deepening to progressively search deeper into the game tree.
+The `Searcher` and `SearcherParallel` classes are responsible for implementing the core search algorithm (Negamax with Alpha-Beta pruning) to find the best move in a given chess position. It uses iterative deepening to progressively search deeper into the game tree.
 
 **Main Features**:
 - Iterative deepening search
 - Alpha-beta pruning for efficient search
 - Transposition table for storing previously evaluated positions
 - Quiescence search to handle tactical complications (captures, checks)
-- Multi-threaded search using worker threads to explore different depths in parallel
+- Parallelized search at different depths using multiple threads
 
 **Important Methods**:
-- `StartSearch()`: Begins the iterative deepening search, using multiple threads to search at different depths.
-- `SearchMovesParallel()`: Core recursive search function with alpha-beta pruning, implemented to run in parallel.
+- `StartSearch()`: Begins the iterative deepening search.
+- `SearchMoves()`: Core recursive search function with alpha-beta pruning.
 - `QuiescenceSearch()`: Searches only capture moves to reach a quiet position.
 - `EndSearch()`: Cancels the search in progress.
 
@@ -102,15 +134,13 @@ The `Board` class represents the chessboard, storing piece positions and game st
    The `EvaluationParallel` class evaluates white and black positions concurrently using `Parallel.Invoke`.
 
 3. **Threaded Search**:  
-   The `Searcher` class creates multiple threads, each searching at different depths. A countdown event is used to synchronize the threads, ensuring all threads complete before the best move is selected.
+   The `SearcherParallel` class creates multiple threads, each searching at different depths. A countdown event is used to synchronize the threads, ensuring all threads complete before the best move is selected.
 
-
+---
 
 ## **Parallelization Outcomes**
-After parallelizing the move generation and evaluation functions, the engine slowed down.
-This is to be expected as the overhead of creating and managing tasks can outweigh the benefits of parallelization for smaller tasks.
-The tasks are lightweight and the overhead of creating and managing them can be significant, especially when the tasks are short-lived.
-
+After parallelizing the move generation and evaluation functions, the engine slowed down.  
+This is to be expected as the overhead of creating and managing tasks can outweigh the benefits of parallelization for smaller tasks. The tasks are lightweight and the overhead of creating and managing them can be significant, especially when the tasks are short-lived.
 
 ---
 
@@ -126,4 +156,3 @@ The tasks are lightweight and the overhead of creating and managing them can be 
    Pawn promotions are handled during move generation. The engine promotes pawns to queens by default but can promote to other pieces as specified.
 
 ---
-

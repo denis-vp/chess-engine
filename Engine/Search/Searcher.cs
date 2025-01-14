@@ -7,7 +7,6 @@ namespace chess_engine.Engine
     {
 
         const int numEntriestranspositionTable = 64000;
-        const int immediateMateScore = 100000;
         const int positiveInfinity = 9999999;
         const int negativeInfinity = -positiveInfinity;
         const int MaxExtensions = 16;
@@ -64,7 +63,8 @@ namespace chess_engine.Engine
                 {
                     if (Settings.PrintSearch)
                     {
-                        Console.WriteLine($"Cancelled, Depth: {searchDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}");
+                        string colorToMove = board.ColorToMove == Piece.White ? "White" : "Black";
+                        Console.WriteLine($"Cancelled, Depth: {searchDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}, Color: {colorToMove}");
                     }
                     break;
                 }
@@ -236,12 +236,6 @@ namespace chess_engine.Engine
             }
 
             return alpha;
-        }
-
-        public static bool IsMateScore(int score)
-        {
-            const int maxMateDepth = 1000;
-            return Abs(score) > immediateMateScore - maxMateDepth;
         }
 
         int ComputeExtensionDepth(Move movePlayed, int numExtensions)

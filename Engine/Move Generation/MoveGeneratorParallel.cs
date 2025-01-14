@@ -55,6 +55,8 @@
 
         override public List<Move> GenerateMoves(Board board, bool includeQuietMoves = true)
         {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+
             this.board = board;
             genQuiets = includeQuietMoves;
             Init();
@@ -73,6 +75,13 @@
             var pawnTask = Task.Run(() => GeneratePawnMoves());
 
             Task.WaitAll(slidingTask, knightTask, pawnTask);
+
+            watch.Stop();
+            if (Settings.PrintMoveGenerationTime)
+            {
+                Console.WriteLine($"Move generation time: {watch.ElapsedTicks} ticks");
+            }
+
             return moves.ToList();
         }
 

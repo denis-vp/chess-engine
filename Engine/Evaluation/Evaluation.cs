@@ -11,6 +11,8 @@
         // So a positive score means the player who's turn it is to move has an advantage, while a negative score indicates a disadvantage.
         override public int Evaluate(Board board)
         {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+
             this.board = board;
             int whiteEval = 0;
             int blackEval = 0;
@@ -34,6 +36,13 @@
             int eval = whiteEval - blackEval;
 
             int perspective = (board.WhiteToMove) ? 1 : -1;
+
+            watch.Stop();
+            if (Settings.PrintEvaluationTime)
+            {
+                Console.WriteLine($"Evaluation time: {watch.ElapsedTicks} ticks");
+            }
+
             return eval * perspective;
         }
 

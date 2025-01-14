@@ -15,6 +15,8 @@ namespace chess_engine
         public static bool MoveGenerationParallel { get; private set; } = true;
         public static bool EvaluationParallel { get; private set; } = true;
         public static bool SearchParallel { get; private set; } = true;
+        public static bool PrintMoveGenerationTime { get; private set; } = false;
+        public static bool PrintEvaluationTime { get; private set; } = false;
 
         private static readonly string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
@@ -40,6 +42,8 @@ namespace chess_engine
                 MoveGenerationParallel = settings.MoveGenerationParallel;
                 EvaluationParallel = settings.EvaluationParallel;
                 SearchParallel = settings.SearchParallel;
+                PrintMoveGenerationTime = settings.PrintMoveGenerationTime;
+                PrintEvaluationTime = settings.PrintEvaluationTime;
             }
         }
 
@@ -52,10 +56,12 @@ namespace chess_engine
             public int MaxBookPly { get; set; } = 16;
             public bool InvertPerspective { get; set; } = false;
             public bool EngineVsEngine { get; set; } = false;
-            public bool PrintSearch { get; set; } = false;
-            public bool MoveGenerationParallel { get; set; } = true;
-            public bool EvaluationParallel { get; set; } = true;
-            public bool SearchParallel { get; set; } = true;
+            public bool PrintSearch { get; set; } = true;
+            public bool MoveGenerationParallel { get; set; } = false;
+            public bool EvaluationParallel { get; set; } = false;
+            public bool SearchParallel { get; set; } = false;
+            public bool PrintMoveGenerationTime { get; set; } = false;
+            public bool PrintEvaluationTime { get; set; } = false;
         }
     }
 }

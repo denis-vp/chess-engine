@@ -143,7 +143,7 @@ namespace chess_engine.Game
             }
             else
             {
-                // TODO: Handle game over
+                Console.WriteLine(result);
             }
         }
 
