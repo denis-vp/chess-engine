@@ -1,6 +1,7 @@
-﻿namespace chess_engine.Engine
+﻿using chess_engine.Engine.Search;
+
+namespace chess_engine.Engine
 {
-    // Thanks to https://web.archive.org/web/20071031100051/http://www.brucemo.com/compchess/programming/hashing.htm
     public class TranspositionTable
     {
 
@@ -104,7 +105,7 @@
 
         int CorrectMateScoreForStorage(int score, int numPlySearched)
         {
-            if (Searcher.IsMateScore(score))
+            if (AbstractSearcher.IsMateScore(score))
             {
                 int sign = System.Math.Sign(score);
                 return (score * sign + numPlySearched) * sign;
@@ -114,7 +115,7 @@
 
         int CorrectRetrievedMateScore(int score, int numPlySearched)
         {
-            if (Searcher.IsMateScore(score))
+            if (AbstractSearcher.IsMateScore(score))
             {
                 int sign = System.Math.Sign(score);
                 return (score * sign - numPlySearched) * sign;

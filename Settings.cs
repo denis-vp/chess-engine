@@ -14,6 +14,7 @@ namespace chess_engine
         public static bool PrintSearch { get; private set; } = false;
         public static bool MoveGenerationParallel { get; private set; } = true;
         public static bool EvaluationParallel { get; private set; } = true;
+        public static bool SearchParallel { get; private set; } = true;
 
         private static readonly string settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
@@ -38,6 +39,7 @@ namespace chess_engine
                 PrintSearch = settings.PrintSearch;
                 MoveGenerationParallel = settings.MoveGenerationParallel;
                 EvaluationParallel = settings.EvaluationParallel;
+                SearchParallel = settings.SearchParallel;
             }
         }
 
@@ -53,6 +55,7 @@ namespace chess_engine
             public bool PrintSearch { get; set; } = false;
             public bool MoveGenerationParallel { get; set; } = true;
             public bool EvaluationParallel { get; set; } = true;
+            public bool SearchParallel { get; set; } = true;
         }
     }
 }

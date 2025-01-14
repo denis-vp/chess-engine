@@ -1,8 +1,9 @@
-﻿using static System.Math;
+﻿using chess_engine.Engine.Search;
+using static System.Math;
 
 namespace chess_engine.Engine
 {
-    public class Searcher
+    public class Searcher : AbstractSearcher
     {
 
         const int numEntriestranspositionTable = 64000;
@@ -10,8 +11,6 @@ namespace chess_engine.Engine
         const int positiveInfinity = 9999999;
         const int negativeInfinity = -positiveInfinity;
         const int MaxExtensions = 16;
-
-        public event Action<Move> OnSearchComplete;
 
         TranspositionTable tt;
         AbstractMoveGenerator moveGenerator;
@@ -35,7 +34,7 @@ namespace chess_engine.Engine
             moveOrdering = new MoveOrdering(moveGenerator);
         }
 
-        public void StartSearch()
+        override public void StartSearch()
         {
             // Initialize search settings
             bestMoveThisIteration = bestMove = Move.NullMove;
@@ -80,10 +79,11 @@ namespace chess_engine.Engine
                     Console.WriteLine($"No move found, playing first move generated: {MoveUtility.GetMoveNameUCI(bestMove)}");
                 }
             }
-            OnSearchComplete?.Invoke(bestMove);
+
+            InvokeOnSearchComplete(bestMove);
         }
 
-        public void EndSearch()
+        override public void EndSearch()
         {
             searchCancelled = true;
         }

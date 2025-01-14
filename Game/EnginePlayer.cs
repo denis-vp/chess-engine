@@ -1,18 +1,19 @@
 ﻿using chess_engine.Engine;
+using chess_engine.Engine.Search;
 
 namespace chess_engine.Game
 {
     public class EnginePlayer
     {
         Board board;
-        Searcher searcher;
+        AbstractSearcher searcher;
         OpeningBook openingBook;
         Action<Move> onMoveChosen;
 
         public EnginePlayer(Board board, Action<Move> onMoveChosen)
         {
             this.board = board;
-            searcher = new Searcher(board);
+            searcher = Settings.SearchParallel ? new SearcherParallel(board) : new Searcher(board);
             searcher.OnSearchComplete += onMoveChosen;
             this.onMoveChosen = onMoveChosen;
             openingBook = new OpeningBook(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Resources.OpeningBookPath)));

@@ -1,19 +1,16 @@
-﻿using static System.Math;
+using chess_engine.Engine.Search;
+using static System.Math;
 
 namespace chess_engine.Engine
 {
-    public class SearcherParallel
+    public class SearcherParallel : AbstractSearcher
     {
 
         const int numEntriestranspositionTable = 64000;
-        const int immediateMateScore = 100000;
         const int positiveInfinity = 9999999;
         const int negativeInfinity = -positiveInfinity;
         const int MaxExtensions = 16;
         const int nrOfThreads = 8;
-
-
-        public event Action<Move> OnSearchComplete;
 
         TranspositionTable tt;
         AbstractMoveGenerator moveGenerator;
@@ -37,7 +34,7 @@ namespace chess_engine.Engine
             moveOrdering = new MoveOrdering(moveGenerator);
         }
 
-        public void StartSearch()
+        override public void StartSearch()
         {
             // Initialize search settings
             bestMove = Move.NullMove;
@@ -96,12 +93,12 @@ namespace chess_engine.Engine
                     Console.WriteLine($"No move found, playing first move generated: {MoveUtility.GetMoveNameUCI(bestMove)}");
                 }
             }
-            OnSearchComplete?.Invoke(bestMove);
+
+            InvokeOnSearchComplete(bestMove);
         }
 
-        public void EndSearch()
+        override public void EndSearch()
         {
-            Console.WriteLine("Search cancelled");
             searchCancelled = true;
         }
 
@@ -272,12 +269,6 @@ namespace chess_engine.Engine
             }
 
             return alpha;
-        }
-
-        public static bool IsMateScore(int score)
-        {
-            const int maxMateDepth = 1000;
-            return Abs(score) > immediateMateScore - maxMateDepth;
         }
 
         int ComputeExtensionDepthParallel(Move movePlayed, int numExtensions, ref Board board, ref AbstractMoveGenerator moveGenerator)

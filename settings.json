@@ -1,12 +1,13 @@
 {
-  "ScreenWidth": 1600,
-  "ScreenHeight": 1600,
-  "IsPlayerWhite": true,
-  "BotThinkTimeSeconds": 1,
+  "ScreenWidth": 800,
+  "ScreenHeight": 800,
+  "IsPlayerWhite": false,
+  "BotThinkTimeSeconds": 5,
   "MaxBookPly": 16,
   "InvertPerspective": false,
   "EngineVsEngine": true,
   "PrintSearch": true,
   "MoveGenerationParallel": false,
-  "EvaluationParallel": false
+  "EvaluationParallel": false,
+  "SearchParallel": true
 }
