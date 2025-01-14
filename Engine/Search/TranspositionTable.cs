@@ -1,4 +1,6 @@
-﻿namespace chess_engine.Engine
+﻿using chess_engine.Engine.Search;
+
+namespace chess_engine.Engine
 {
     public class TranspositionTable
     {
@@ -103,7 +105,7 @@
 
         int CorrectMateScoreForStorage(int score, int numPlySearched)
         {
-            if (SearcherParallel.IsMateScore(score))
+            if (AbstractSearcher.IsMateScore(score))
             {
                 int sign = System.Math.Sign(score);
                 return (score * sign + numPlySearched) * sign;
@@ -113,7 +115,7 @@
 
         int CorrectRetrievedMateScore(int score, int numPlySearched)
         {
-            if (SearcherParallel.IsMateScore(score))
+            if (AbstractSearcher.IsMateScore(score))
             {
                 int sign = System.Math.Sign(score);
                 return (score * sign - numPlySearched) * sign;

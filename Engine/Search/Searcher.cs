@@ -3,29 +3,29 @@ using static System.Math;
 
 namespace chess_engine.Engine
 {
-    public class SearcherParallel : AbstractSearcher
+    public class Searcher : AbstractSearcher
     {
 
         const int numEntriestranspositionTable = 64000;
+        const int immediateMateScore = 100000;
         const int positiveInfinity = 9999999;
         const int negativeInfinity = -positiveInfinity;
         const int MaxExtensions = 16;
-        const int nrOfThreads = 8;
 
         TranspositionTable tt;
         AbstractMoveGenerator moveGenerator;
 
-        int bestEvalDepth;
+        Move bestMoveThisIteration;
+        int bestEvalThisIteration;
         Move bestMove;
-        Board board;
         int bestEval;
         bool searchCancelled;
-        object ttLock = new object();
 
         MoveOrdering moveOrdering;
+        Board board;
         AbstractEvaluation evaluation;
 
-        public SearcherParallel(Board board)
+        public Searcher(Board board)
         {
             this.board = board;
             evaluation = Settings.EvaluationParallel ? new EvaluationParallel() : new Evaluation();
@@ -37,51 +37,37 @@ namespace chess_engine.Engine
         override public void StartSearch()
         {
             // Initialize search settings
-            bestMove = Move.NullMove;
-            bestEval = bestEvalDepth = 0;
-            tt.enabled = false;
-            var threads = new Thread[nrOfThreads];
+            bestMoveThisIteration = bestMove = Move.NullMove;
+            bestEvalThisIteration = bestEval = 0;
+            tt.enabled = true;
 
             moveGenerator.promotionsToGenerate = AbstractMoveGenerator.PromotionMode.QueenAndKnight;
             searchCancelled = false;
-            object syncObject = new object(); // For synchronizing best move updates
 
-            using (var countdown = new CountdownEvent(nrOfThreads))
+            for (int searchDepth = 1; searchDepth <= 256; searchDepth++)
             {
-                for (int threadIndex = 0; threadIndex < nrOfThreads; threadIndex++)
+                bestMoveThisIteration = Move.NullMove;
+                bestEvalThisIteration = negativeInfinity;
+                SearchMoves(searchDepth, 0, negativeInfinity, positiveInfinity);
+
+                if (!Move.IsNullMove(bestMoveThisIteration))
                 {
-                    threads[threadIndex] = new Thread(() =>
+                    bestMove = bestMoveThisIteration;
+                    bestEval = bestEvalThisIteration;
+                    if (Settings.PrintSearch)
                     {
-                        int threadDepth = threadIndex + 1;
-                        int localBestEvalThisIteration = negativeInfinity;
-                        Move localBestMoveThisIteration = Move.NullMove;
-                        Board localBoard = new(board);
-                        AbstractMoveGenerator localMoveGenerator = new MoveGenerator();
-
-                        int eval = SearchMovesParallel(threadDepth, 0, negativeInfinity, positiveInfinity, ref localBestEvalThisIteration, ref localBestMoveThisIteration, ref localBoard, ref localMoveGenerator);
-
-                        if (threadDepth > bestEvalDepth && !Move.IsNullMove(localBestMoveThisIteration))
-                        {
-                            bestEval = eval;
-                            bestEvalDepth = threadDepth;
-                            bestMove = localBestMoveThisIteration;
-                            if (Settings.PrintSearch)
-                            {
-                                Console.WriteLine($"Depth: {threadDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}");
-                            }
-                        }
-
-                        countdown.Signal();
-                    });
-                    threads[threadIndex].Start();
+                        Console.WriteLine($"Depth: {searchDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}");
+                    }
                 }
-                countdown.Wait();
-            }
 
-            if (Settings.PrintSearch && searchCancelled)
-            {
-                Console.WriteLine($"Cancelled, Depth: {bestEvalDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}");
-
+                if (searchCancelled)
+                {
+                    if (Settings.PrintSearch)
+                    {
+                        Console.WriteLine($"Cancelled, Depth: {searchDepth}, Best move: {MoveUtility.GetMoveNameUCI(bestMove)}, Eval: {bestEval}");
+                    }
+                    break;
+                }
             }
 
             // If search didn't find a move before being cancelled, just play the first move generated
@@ -102,7 +88,7 @@ namespace chess_engine.Engine
             searchCancelled = true;
         }
 
-        int SearchMovesParallel(int depth, int plyFromRoot, int alpha, int beta, ref int bestEvalThisIteration, ref Move bestMoveThisIteration, ref Board board, ref AbstractMoveGenerator moveGenerator, List<Move> moves = null, int numExtensions = 0)
+        int SearchMoves(int depth, int plyFromRoot, int alpha, int beta, List<Move> moves = null, int numExtensions = 0)
         {
             if (searchCancelled)
             {
@@ -133,30 +119,20 @@ namespace chess_engine.Engine
             // Try looking up the current position in the transposition table.
             // If the same position has already been searched to at least an equal depth
             // to the search we're doing now,we can just use the recorded evaluation.
-
-            int ttVal = TranspositionTable.lookupFailed;
-
-            lock (ttLock)
-            {
-                ttVal = tt.LookupEvaluation(depth, plyFromRoot, alpha, beta);
-            }
+            int ttVal = tt.LookupEvaluation(depth, plyFromRoot, alpha, beta);
             if (ttVal != TranspositionTable.lookupFailed)
             {
                 if (plyFromRoot == 0)
                 {
-                    lock (ttLock)
-                    {
-                        bestMoveThisIteration = tt.GetStoredMove();
-                        bestEvalThisIteration = tt.entries[tt.Index].value;
-                    }
-
+                    bestMoveThisIteration = tt.GetStoredMove();
+                    bestEvalThisIteration = tt.entries[tt.Index].value;
                 }
                 return ttVal;
             }
 
             if (depth == 0)
             {
-                int evaluation = QuiescenceSearch(alpha, beta, ref board, ref moveGenerator);
+                int evaluation = QuiescenceSearch(alpha, beta);
                 return evaluation;
             }
 
@@ -164,12 +140,7 @@ namespace chess_engine.Engine
             {
                 moves = moveGenerator.GenerateMoves(board);
             }
-            Move prevBestMove = Move.NullMove;
-            lock (ttLock)
-            {
-                prevBestMove = plyFromRoot == 0 ? bestMove : tt.TryGetStoredMove();
-
-            }
+            Move prevBestMove = plyFromRoot == 0 ? bestMove : tt.TryGetStoredMove();
             moveOrdering.OrderMoves(prevBestMove, board, moves);
             // Detect checkmate and stalemate when no legal moves are available
             if (moves.Count == 0)
@@ -192,8 +163,8 @@ namespace chess_engine.Engine
             {
                 board.MakeMove(moves[i], inSearch: true);
                 List<Move> opponentMoves = moveGenerator.GenerateMoves(board);
-                int extension = ComputeExtensionDepthParallel(moves[i], numExtensions, ref board, ref moveGenerator);
-                int eval = -SearchMovesParallel(depth - 1 + extension, plyFromRoot + 1, -beta, -alpha, ref bestEvalThisIteration, ref bestMoveThisIteration, ref board, ref moveGenerator, opponentMoves, numExtensions + extension);
+                int extension = ComputeExtensionDepth(moves[i], numExtensions);
+                int eval = -SearchMoves(depth - 1 + extension, plyFromRoot + 1, -beta, -alpha, opponentMoves, numExtensions + extension);
                 board.UnmakeMove(moves[i], inSearch: true);
 
                 if (searchCancelled)
@@ -205,10 +176,7 @@ namespace chess_engine.Engine
                 // (by choosing a different move earlier on). Skip remaining moves.
                 if (eval >= beta)
                 {
-                    lock (ttLock)
-                    {
-                        tt.StoreEvaluation(depth, plyFromRoot, beta, TranspositionTable.LowerBound, moves[i]);
-                    }
+                    tt.StoreEvaluation(depth, plyFromRoot, beta, TranspositionTable.LowerBound, moves[i]);
                     return beta;
                 }
 
@@ -226,16 +194,15 @@ namespace chess_engine.Engine
                     }
                 }
             }
-            lock (ttLock)
-            {
-                tt.StoreEvaluation(depth, plyFromRoot, alpha, evalType, bestMoveInThisPosition);
-            }
+
+            tt.StoreEvaluation(depth, plyFromRoot, alpha, evalType, bestMoveInThisPosition);
 
             return alpha;
+
         }
 
         // Search capture moves until a 'quiet' position is reached.
-        int QuiescenceSearch(int alpha, int beta, ref Board board, ref AbstractMoveGenerator moveGenerator)
+        int QuiescenceSearch(int alpha, int beta)
         {
             // A player isn't forced to make a capture (typically), so see what the evaluation is without capturing anything.
             // This prevents situations where a player ony has bad captures available from being evaluated as bad,
@@ -255,7 +222,7 @@ namespace chess_engine.Engine
             for (int i = 0; i < moves.Count; i++)
             {
                 board.MakeMove(moves[i], true);
-                eval = -QuiescenceSearch(-beta, -alpha, ref board, ref moveGenerator);
+                eval = -QuiescenceSearch(-beta, -alpha);
                 board.UnmakeMove(moves[i], true);
 
                 if (eval >= beta)
@@ -271,7 +238,13 @@ namespace chess_engine.Engine
             return alpha;
         }
 
-        int ComputeExtensionDepthParallel(Move movePlayed, int numExtensions, ref Board board, ref AbstractMoveGenerator moveGenerator)
+        public static bool IsMateScore(int score)
+        {
+            const int maxMateDepth = 1000;
+            return Abs(score) > immediateMateScore - maxMateDepth;
+        }
+
+        int ComputeExtensionDepth(Move movePlayed, int numExtensions)
         {
             int movedPieceType = Piece.PieceType(board.Squares[movePlayed.StartSquare]);
             int targetRank = BoardHelper.RankIndex(movePlayed.TargetSquare);

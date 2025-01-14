@@ -8,5 +8,6 @@
   "EngineVsEngine": true,
   "PrintSearch": true,
   "MoveGenerationParallel": false,
-  "EvaluationParallel": false
+  "EvaluationParallel": false,
+  "SearchParallel": true
 }
