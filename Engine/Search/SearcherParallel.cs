@@ -1,4 +1,4 @@
-﻿using chess_engine.Engine.Search;
+using chess_engine.Engine.Search;
 using static System.Math;
 
 namespace chess_engine.Engine
